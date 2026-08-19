@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ListingCategory {
+  ELECTRONICS
+  VEHICLES
+  FURNITURE_HOME
+  FASHION
+  APPLIANCES
+  MACHINERY_EQUIPMENT
+  SPORTS_LEISURE
+  OFFICE_BUSINESS
+  OTHER
+}
+
+enum ListingStatus {
+  AVAILABLE
+  PENDING
+  SOLD
+  REMOVED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  COMPLETED
+}
+
+enum AdStatus {
+  PENDING
+  PENDING_APPROVAL
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum VideoSource {
+  YOUTUBE
+  UPLOAD
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  phone         String?
+  role          Role      @default(USER)
+
+  accounts      Account[]
+  sessions      Session[]
+  listings      Listing[]
+  orders        Order[]         @relation("BuyerOrders")
+  ads           Advertisement[]
+  movers        Mover[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Listing {
+  id          String          @id @default(cuid())
+  title       String
+  description String
+  category    ListingCategory
+  price       Float
+  quantity    Int             @default(1)
+  images      String
+  status      ListingStatus   @default(AVAILABLE)
+
+  latitude  Float
+  longitude Float
+  address   String?
+  phone     String?
+
+  mpesaCheckoutRequestId String?
+  mpesaReceipt           String?
+  failureReason          String?
+
+  seller   User   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  sellerId String
+
+  orders Order[]
+  ads    Advertisement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([status])
+  @@index([sellerId])
+  @@map("listings")
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  listing     Listing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId   String
+  buyer       User        @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  buyerId     String
+  quantity    Int         @default(1)
+  totalAmount Float
+  status      OrderStatus @default(PENDING)
+  phone       String
+
+  mpesaCheckoutRequestId String?
+  mpesaReceipt           String?
+  failureReason          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([buyerId])
+  @@index([listingId])
+  @@index([status])
+  @@map("orders")
+}
+
+model Advertisement {
+  id     String   @id @default(cuid())
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+  owner     User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId   String
+
+  plan   String
+  amount Float
+  status AdStatus @default(PENDING)
+
+  videoSource VideoSource?
+  videoUrl    String?
+
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  mpesaCheckoutRequestId String?
+  mpesaReceipt           String?
+  failureReason          String?
+
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+  @@index([listingId])
+  @@index([status])
+  @@map("advertisements")
+}
+
+model Mover {
+  id          String  @id @default(cuid())
+  owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId     String
+  vehicleType String
+  description String?
+  phone       String
+  image       String
+  active      Boolean @default(true)
+
+  latitude  Float
+  longitude Float
+  address   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([active])
+  @@map("movers")
+}
