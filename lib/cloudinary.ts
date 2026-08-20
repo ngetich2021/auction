@@ -7,11 +7,11 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-async function uploadFile(file: File, folder: string, resourceType: "image" | "video"): Promise<string> {
+async function uploadFile(file: File, folder: string): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer());
 
   return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream({ folder, resource_type: resourceType }, (error, result) => {
+    const stream = cloudinary.uploader.upload_stream({ folder, resource_type: "image" }, (error, result) => {
       if (error || !result) {
         reject(error ?? new Error("Cloudinary upload failed"));
         return;
@@ -23,13 +23,9 @@ async function uploadFile(file: File, folder: string, resourceType: "image" | "v
 }
 
 export function uploadListingImage(file: File): Promise<string> {
-  return uploadFile(file, "disposals/listings", "image");
-}
-
-export function uploadPromoVideo(file: File): Promise<string> {
-  return uploadFile(file, "disposals/promo-videos", "video");
+  return uploadFile(file, "disposals/listings");
 }
 
 export function uploadMoverImage(file: File): Promise<string> {
-  return uploadFile(file, "disposals/movers", "image");
+  return uploadFile(file, "disposals/movers");
 }

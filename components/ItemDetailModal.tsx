@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { Session } from "next-auth";
 import { CATEGORY_LABELS } from "@/lib/validations/listing";
 import type { ClientListing } from "@/types/listing";
+import { CallButton } from "@/components/ui/CallButton";
 
 export function ItemDetailModal({
   listing,
@@ -63,12 +64,10 @@ export function ItemDetailModal({
             <>
               {listing.phone ? (
                 <div className="flex items-center gap-2">
-                  <a
-                    href={`tel:${listing.phone}`}
+                  <CallButton
+                    phone={listing.phone}
                     className="flex-1 rounded-full bg-zinc-900 px-4 py-2 text-center text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  >
-                    Call {listing.phone}
-                  </a>
+                  />
                   <a
                     href={`https://wa.me/${listing.phone.replace(/\D/g, "")}`}
                     target="_blank"

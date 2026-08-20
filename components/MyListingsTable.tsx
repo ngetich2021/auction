@@ -191,6 +191,7 @@ export function MyListingsTable({ listings }: { listings: ClientListing[] }) {
       filterColumnId="title"
       filterPlaceholder="Filter by title…"
       emptyMessage="You have not posted any listings yet."
+      exportFilename="my-listings"
     />
   );
 }

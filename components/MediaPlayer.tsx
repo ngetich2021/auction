@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { Session } from "next-auth";
 import { extractYoutubeId } from "@/lib/validations/advertisement";
-import { CATEGORY_LABELS, type LISTING_CATEGORIES } from "@/lib/validations/listing";
+import { haversineKm } from "@/lib/geo";
+import { ItemDetailModal } from "@/components/ItemDetailModal";
+import { CATEGORY_LABELS } from "@/lib/validations/listing";
+import type { ClientListing } from "@/types/listing";
 
 export type PromoVideo = {
   id: string;
   number: number;
-  title: string;
   videoUrl: string;
-  videoSource: "YOUTUBE" | "UPLOAD";
-  listingId?: string;
-  price?: number;
-  category?: (typeof LISTING_CATEGORIES)[number];
+  listing: ClientListing;
 };
 
 function youtubeEmbedUrl(url: string, autoplay: boolean, loopSingle: boolean): string | null {
@@ -32,28 +32,21 @@ function sendYoutubeCommand(iframe: HTMLIFrameElement | null, func: string) {
   iframe?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
 }
 
-const EXAMPLE_VIDEO: PromoVideo = {
-  id: "example",
-  number: 1,
-  title: "Example",
-  videoUrl: "https://www.youtube.com/watch?v=Mlj6jhdGZxk",
-  videoSource: "YOUTUBE",
-};
-
-export function MediaPlayer({ videos }: { videos: PromoVideo[] }) {
+export function MediaPlayer({ videos, session }: { videos: PromoVideo[]; session: Session | null }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const [interacted, setInteracted] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [showFullDetails, setShowFullDetails] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (interacted) return;
     function handleClick() {
       setInteracted(true);
-      if (videoRef.current) videoRef.current.muted = false;
-      videoRef.current?.play().catch(() => {});
       // the YouTube iframe reloads with autoplay=1 in response to this same click, so a
       // brief delay lets it attach its postMessage listener before we force it unmuted
       setTimeout(() => {
@@ -65,24 +58,31 @@ export function MediaPlayer({ videos }: { videos: PromoVideo[] }) {
     return () => document.removeEventListener("click", handleClick);
   }, [interacted]);
 
-  const playlist = videos.length > 0 ? videos : [EXAMPLE_VIDEO];
+  const playlist = videos;
   const index = Math.min(activeIndex, playlist.length - 1);
   const active = playlist[index];
   const loopSingle = playlist.length === 1;
-  const embedUrl =
-    active.videoSource === "YOUTUBE" ? youtubeEmbedUrl(active.videoUrl, interacted, loopSingle) : null;
-  const failed = failedIds.has(active.id) || (active.videoSource === "YOUTUBE" && !embedUrl);
+  const embedUrl = active ? youtubeEmbedUrl(active.videoUrl, interacted, loopSingle) : null;
+  const failed = active ? failedIds.has(active.id) || !embedUrl : false;
+
+  function nextIndexSkippingFailed(fromIndex: number, failed: Set<string>): number {
+    for (let step = 1; step <= playlist.length; step++) {
+      const next = (fromIndex + step) % playlist.length;
+      if (!failed.has(playlist[next].id)) return next;
+    }
+    return fromIndex;
+  }
 
   function markFailed(id: string) {
-    setFailedIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
+    if (failedIds.has(id)) return;
+    const updated = new Set(failedIds).add(id);
+    setFailedIds(updated);
+    // Skip permanently past a video that failed instead of getting stuck on its error screen.
+    setActiveIndex((i) => nextIndexSkippingFailed(i, updated));
   }
 
   function advance() {
-    setActiveIndex((i) => (i + 1) % playlist.length);
+    setActiveIndex((i) => nextIndexSkippingFailed(i, failedIds));
   }
 
   // YouTube's iframe posts player-state changes once enablejsapi is set; state 0 means the
@@ -109,35 +109,56 @@ export function MediaPlayer({ videos }: { videos: PromoVideo[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlist.length]);
 
+  function handleOpenDetails() {
+    setExpanded(true);
+    if (userLocation || locating || !navigator.geolocation) return;
+    setLocating(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        setLocating(false);
+      },
+      () => {
+        setLocationError("Enable location access to see how far this item is.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  const distanceKm =
+    active && userLocation
+      ? haversineKm(userLocation.latitude, userLocation.longitude, active.listing.latitude, active.listing.longitude)
+      : null;
+
+  if (playlist.length === 0) {
+    return (
+      <div className="mx-auto flex w-full flex-col sm:w-11/12 md:w-4/5 lg:w-3/5">
+        <div className="flex aspect-3/1 w-full items-center justify-center bg-black text-sm text-white/60 sm:aspect-7/2 md:aspect-4/1 lg:aspect-32/9">
+          No promo videos are live right now.
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto flex w-2/5 flex-col">
-      <div className="relative aspect-32/9 w-full bg-black">
+    <div className="mx-auto flex w-full flex-col sm:w-11/12 md:w-4/5 lg:w-3/5">
+      <div className="relative aspect-3/1 w-full bg-black sm:aspect-7/2 md:aspect-4/1 lg:aspect-32/9">
         {failed ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 text-white/80">
             <span className="text-2xl font-semibold">#{active.number}</span>
             <span className="text-sm">Video {active.number} failed to load</span>
           </div>
-        ) : active.videoSource === "YOUTUBE" ? (
+        ) : (
           <iframe
             key={active.id}
             ref={iframeRef}
             src={embedUrl!}
-            title={active.title}
+            title={active.listing.title}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
             className="h-full w-full"
-            onError={() => markFailed(active.id)}
-          />
-        ) : (
-          <video
-            key={active.id}
-            ref={videoRef}
-            src={active.videoUrl}
-            autoPlay={interacted}
-            loop={loopSingle}
-            controls
-            className="h-full w-full"
-            onEnded={loopSingle ? undefined : advance}
             onError={() => markFailed(active.id)}
           />
         )}
@@ -145,33 +166,11 @@ export function MediaPlayer({ videos }: { videos: PromoVideo[] }) {
 
       <button
         type="button"
-        onClick={() => setExpanded(true)}
+        onClick={handleOpenDetails}
         className="py-2 text-center text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
       >
         Interested? View details →
       </button>
-
-      {playlist.length > 1 && (
-        <div className="flex flex-wrap justify-center gap-1.5 pb-2">
-          {playlist.map((video, i) => (
-            <button
-              key={video.id}
-              type="button"
-              onClick={() => setActiveIndex(i)}
-              aria-label={`Play video ${video.number}`}
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
-                i === index
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : failedIds.has(video.id)
-                    ? "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-300"
-                    : "bg-zinc-100 dark:bg-zinc-800"
-              }`}
-            >
-              {video.number}
-            </button>
-          ))}
-        </div>
-      )}
 
       {expanded && (
         <div
@@ -183,23 +182,43 @@ export function MediaPlayer({ videos }: { videos: PromoVideo[] }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-semibold">{active.title}</p>
-              {active.category && <p className="text-xs text-zinc-500">{CATEGORY_LABELS[active.category]}</p>}
-              {typeof active.price === "number" && (
-                <p className="text-sm font-medium">KES {active.price.toLocaleString()}</p>
+              <p className="text-sm font-semibold">{active.listing.title}</p>
+              <p className="text-xs text-zinc-500">{CATEGORY_LABELS[active.listing.category]}</p>
+              <p className="text-sm font-medium">KES {active.listing.price.toLocaleString()}</p>
+              {active.listing.address && <p className="text-xs text-zinc-500">{active.listing.address}</p>}
+              {distanceKm != null && (
+                <p className="text-xs text-zinc-500">{distanceKm.toFixed(1)} km from you</p>
               )}
-              {!active.listingId && <p className="text-xs text-zinc-400">Example promotional video.</p>}
+              {locating && <p className="text-xs text-zinc-400">Finding your location…</p>}
+              {locationError && !locating && <p className="text-xs text-zinc-400">{locationError}</p>}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setExpanded(false)}
-              className="self-end rounded-full bg-zinc-100 dark:bg-zinc-800 px-4 py-1.5 text-xs font-medium"
-            >
-              Close
-            </button>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setShowFullDetails(true)}
+                className="rounded-full bg-zinc-900 px-4 py-1.5 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+              >
+                More details
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpanded(false)}
+                className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-4 py-1.5 text-xs font-medium"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {showFullDetails && (
+        <ItemDetailModal
+          listing={{ ...active.listing, distanceKm }}
+          session={session}
+          onClose={() => setShowFullDetails(false)}
+        />
       )}
     </div>
   );

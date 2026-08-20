@@ -1,20 +1,34 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 import { useSingleFlightAction } from "@/hooks/useSingleFlightAction";
 import { updateUserRole, adminModerateListing } from "@/lib/actions/admin";
+import { assignUserRole } from "@/lib/actions/roles";
 import { approveAdvertisement, rejectAdvertisement } from "@/lib/actions/advertisements";
+import { VIDEO_NOT_PLAYING_REASON } from "@/lib/validations/advertisement";
 import { CATEGORY_LABELS, LISTING_POST_FEE_KES } from "@/lib/validations/listing";
+import { hasPermission, type SessionPermission } from "@/lib/permissions";
+import { RolesModal, PermissionsModal, type AdminRole } from "@/components/AdminRolesPermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { Modal } from "@/components/ui/Modal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { ListingCategory, ListingStatus } from "@/types/listing";
 import type { AdminPayment } from "@/lib/queries";
 
-type AdStatus = "PENDING" | "PENDING_APPROVAL" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+type AdStatus = "PENDING" | "PENDING_APPROVAL" | "ACTIVE" | "EXPIRED" | "CANCELLED" | "REJECTED";
 type PaymentStatus = "PAID" | "AWAITING_PAYMENT" | "FAILED";
+
+export type AdminAccess = { isSuperAdmin: boolean; permissions: SessionPermission[] };
 
 type AdminStats = {
   userCount: number;
@@ -31,10 +45,13 @@ type AdminUser = {
   name: string | null;
   email: string;
   role: "USER" | "ADMIN";
+  customRoleId: string | null;
+  customRole: { id: string; name: string } | null;
 };
 type AdminListing = {
   id: string;
   title: string;
+  images: string[];
   category: ListingCategory;
   status: ListingStatus;
   paymentStatus: PaymentStatus;
@@ -57,16 +74,18 @@ type AdminAdvertisement = {
 };
 
 export type AdminData = {
-  stats: AdminStats;
+  stats: AdminStats | null;
   users: AdminUser[];
   listings: AdminListing[];
   orders: AdminOrder[];
   adverts: AdminAdvertisement[];
   payments: AdminPayment[];
+  roles: AdminRole[];
 };
 
 const TABS = ["overview", "users", "listings", "adverts", "orders", "payments"] as const;
 type Tab = (typeof TABS)[number];
+const RESOURCE_TABS = ["users", "listings", "adverts", "orders", "payments"] as const;
 const TAB_LABELS: Record<Tab, string> = {
   overview: "Overview",
   users: "Users",
@@ -87,100 +106,203 @@ function sortableHeader(label: string) {
   };
 }
 
-function RoleForm({ user }: { user: AdminUser }) {
+function ActionsTrigger({ disabled }: { disabled?: boolean }) {
+  return (
+    <DropdownMenuTrigger
+      render={
+        <Button variant="ghost" size="icon" disabled={disabled}>
+          <MoreHorizontal className="size-4" />
+          <span className="sr-only">Open menu</span>
+        </Button>
+      }
+    />
+  );
+}
+
+function UserActions({ user, roles, isSuperAdmin }: { user: AdminUser; roles: AdminRole[]; isSuperAdmin: boolean }) {
   const [state, formAction, pending] = useSingleFlightAction(updateUserRole);
-  return (
-    <form action={formAction} className="flex flex-wrap items-center gap-2">
-      <input type="hidden" name="userId" value={user.id} />
-      <select
-        name="role"
-        defaultValue={user.role}
-        className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs"
-      >
-        <option value="USER">USER</option>
-        <option value="ADMIN">ADMIN</option>
-      </select>
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-xs disabled:opacity-50"
-      >
-        {pending ? "Saving…" : "Save"}
-      </button>
-      {state?.message && (
-        <span className={`text-xs ${state.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-          {state.message}
-        </span>
-      )}
-    </form>
-  );
-}
+  const [roleState, roleAction, rolePending] = useSingleFlightAction(assignUserRole);
 
-function ListingModerationForm({ listing }: { listing: AdminListing }) {
-  const [state, formAction, pending] = useSingleFlightAction(adminModerateListing);
-  return (
-    <form action={formAction} className="flex flex-wrap items-center gap-2">
-      <input type="hidden" name="listingId" value={listing.id} />
-      <select
-        name="status"
-        defaultValue={listing.status}
-        className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs"
-      >
-        <option value="AVAILABLE">AVAILABLE</option>
-        <option value="PENDING">PENDING</option>
-        <option value="SOLD">SOLD</option>
-        <option value="REMOVED">REMOVED</option>
-      </select>
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-xs disabled:opacity-50"
-      >
-        {pending ? "Saving…" : "Save"}
-      </button>
-      {state?.message && (
-        <span className={`text-xs ${state.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-          {state.message}
-        </span>
-      )}
-    </form>
-  );
-}
+  function setRole(role: "USER" | "ADMIN") {
+    const formData = new FormData();
+    formData.set("userId", user.id);
+    formData.set("role", role);
+    formAction(formData);
+  }
 
-function AdvertApprovalActions({ ad }: { ad: AdminAdvertisement }) {
-  const [approveState, approveAction, approving] = useSingleFlightAction(approveAdvertisement);
-  const [rejectState, rejectAction, rejecting] = useSingleFlightAction(rejectAdvertisement);
+  function setCustomRole(customRoleId: string) {
+    const formData = new FormData();
+    formData.set("userId", user.id);
+    formData.set("customRoleId", customRoleId);
+    roleAction(formData);
+  }
 
-  if (ad.status !== "PENDING_APPROVAL") {
+  // Granting/removing ADMIN or a custom role is a super-admin-only privilege — a scoped role
+  // must never be able to widen anyone's access, including its own.
+  if (!isSuperAdmin) {
     return <span className="text-xs text-muted-foreground">—</span>;
   }
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="flex gap-1.5">
-        <form action={approveAction}>
-          <input type="hidden" name="advertisementId" value={ad.id} />
-          <button
-            type="submit"
-            disabled={approving || rejecting}
-            className="rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2 py-1 text-xs disabled:opacity-50"
-          >
-            {approving ? "Approving…" : "Approve"}
-          </button>
-        </form>
-        <form action={rejectAction}>
-          <input type="hidden" name="advertisementId" value={ad.id} />
-          <button
-            type="submit"
-            disabled={approving || rejecting}
-            className="rounded-full bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 px-2 py-1 text-xs disabled:opacity-50"
-          >
-            {rejecting ? "Rejecting…" : "Reject"}
-          </button>
-        </form>
-      </div>
+      <DropdownMenu>
+        <ActionsTrigger disabled={pending || rolePending} />
+        <DropdownMenuContent align="end">
+          {user.role !== "ADMIN" && <DropdownMenuItem onClick={() => setRole("ADMIN")}>Promote to admin</DropdownMenuItem>}
+          {user.role !== "USER" && <DropdownMenuItem onClick={() => setRole("USER")}>Demote to user</DropdownMenuItem>}
+          {roles.map(
+            (role) =>
+              role.id !== user.customRoleId && (
+                <DropdownMenuItem key={role.id} onClick={() => setCustomRole(role.id)}>
+                  Assign role: {role.name}
+                </DropdownMenuItem>
+              )
+          )}
+          {user.customRoleId && (
+            <DropdownMenuItem onClick={() => setCustomRole("")}>Remove custom role</DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {(state?.message || roleState?.message) && (
+        <span
+          className={`text-xs ${
+            (state?.ok ?? roleState?.ok) ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+          }`}
+        >
+          {state?.message ?? roleState?.message}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const LISTING_STATUS_OPTIONS: { value: ListingStatus; label: string }[] = [
+  { value: "AVAILABLE", label: "Mark available" },
+  { value: "PENDING", label: "Mark pending" },
+  { value: "SOLD", label: "Mark sold" },
+  { value: "REMOVED", label: "Mark removed" },
+];
+
+function ListingActions({ listing, canManage }: { listing: AdminListing; canManage: boolean }) {
+  const [state, formAction, pending] = useSingleFlightAction(adminModerateListing);
+
+  function setStatus(status: ListingStatus) {
+    const formData = new FormData();
+    formData.set("listingId", listing.id);
+    formData.set("status", status);
+    formAction(formData);
+  }
+
+  if (!canManage) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <DropdownMenu>
+        <ActionsTrigger disabled={pending} />
+        <DropdownMenuContent align="end">
+          {LISTING_STATUS_OPTIONS.filter((o) => o.value !== listing.status).map((o) => (
+            <DropdownMenuItem key={o.value} onClick={() => setStatus(o.value)}>
+              {o.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {state?.message && (
+        <span className={`text-xs ${state.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+          {state.message}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function AdvertApprovalActions({ ad, canManage }: { ad: AdminAdvertisement; canManage: boolean }) {
+  const [approveState, approveAction, approving] = useSingleFlightAction(approveAdvertisement);
+  const [rejectState, rejectAction, rejecting] = useSingleFlightAction(rejectAdvertisement);
+  const [modalKind, setModalKind] = useState<"approve" | "reject" | null>(null);
+  const [note, setNote] = useState("");
+
+  const canApprove = canManage && ad.status === "PENDING_APPROVAL";
+  // Admin can pull down anything that isn't already cancelled/expired — including a live ad
+  // whose video has stopped playing.
+  const canReject =
+    canManage && (ad.status === "PENDING" || ad.status === "PENDING_APPROVAL" || ad.status === "ACTIVE");
+
+  if (!canApprove && !canReject) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+
+  function openModal(kind: "approve" | "reject") {
+    setNote("");
+    setModalKind(kind);
+  }
+
+  function submit() {
+    const formData = new FormData();
+    formData.set("advertisementId", ad.id);
+    formData.set("note", note);
+    if (modalKind === "approve") approveAction(formData);
+    else if (modalKind === "reject") rejectAction(formData);
+    setModalKind(null);
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <DropdownMenu>
+        <ActionsTrigger disabled={approving || rejecting} />
+        <DropdownMenuContent align="end">
+          {canApprove && <DropdownMenuItem onClick={() => openModal("approve")}>Approve</DropdownMenuItem>}
+          {canReject && (
+            <DropdownMenuItem variant="destructive" onClick={() => openModal("reject")}>
+              Reject
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
       {(approveState?.message || rejectState?.message) && (
         <span className="text-xs text-muted-foreground">{approveState?.message ?? rejectState?.message}</span>
+      )}
+
+      {modalKind && (
+        <Modal onClose={() => setModalKind(null)}>
+          <div className="flex flex-col gap-3 p-4">
+            <h3 className="text-base font-semibold">
+              {modalKind === "approve" ? "Approve advertisement" : "Reject advertisement"}
+            </h3>
+            <p className="text-sm text-zinc-500">{ad.listing.title}</p>
+            {modalKind === "reject" && (
+              <button
+                type="button"
+                onClick={() => setNote(VIDEO_NOT_PLAYING_REASON)}
+                className="self-start rounded-full bg-zinc-100 dark:bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+              >
+                Quick reason: video not playing
+              </button>
+            )}
+            <label className="flex flex-col gap-1 text-sm">
+              Note (optional)
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={3}
+                placeholder="Visible to the advertiser…"
+                className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={approving || rejecting}
+              className={`self-start rounded-full px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+                modalKind === "approve" ? "bg-emerald-600" : "bg-red-600"
+              }`}
+            >
+              {modalKind === "approve" ? (approving ? "Approving…" : "Approve") : rejecting ? "Rejecting…" : "Reject"}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );
@@ -195,15 +317,50 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-const userColumns: ColumnDef<AdminUser>[] = [
-  { accessorKey: "name", header: sortableHeader("Name"), cell: ({ row }) => row.original.name ?? "—" },
-  { accessorKey: "email", header: sortableHeader("Email") },
-  { accessorKey: "role", header: sortableHeader("Role"), cell: ({ row }) => <Badge variant="outline">{row.original.role}</Badge> },
-  { id: "actions", header: () => <span className="sr-only">Actions</span>, cell: ({ row }) => <RoleForm user={row.original} /> },
-];
+function buildUserColumns(roles: AdminRole[], isSuperAdmin: boolean): ColumnDef<AdminUser>[] {
+  return [
+    { accessorKey: "name", header: sortableHeader("Name"), cell: ({ row }) => row.original.name ?? "—" },
+    { accessorKey: "email", header: sortableHeader("Email") },
+    {
+      accessorKey: "role",
+      header: sortableHeader("Role"),
+      cell: ({ row }) => (
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="outline">{row.original.role}</Badge>
+          {row.original.customRole && <Badge variant="secondary">{row.original.customRole.name}</Badge>}
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      header: () => <span className="sr-only">Actions</span>,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <div className="flex justify-end">
+          <UserActions user={row.original} roles={roles} isSuperAdmin={isSuperAdmin} />
+        </div>
+      ),
+    },
+  ];
+}
 
-const listingColumns: ColumnDef<AdminListing>[] = [
-  { accessorKey: "title", header: sortableHeader("Title") },
+function buildListingColumns(canManage: boolean): ColumnDef<AdminListing>[] {
+  return [
+  {
+    accessorKey: "title",
+    header: sortableHeader("Title"),
+    cell: ({ row }) => {
+      const listing = row.original;
+      return (
+        <div className="flex items-center gap-2">
+          <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-muted">
+            {listing.images[0] && <Image src={listing.images[0]} alt="" fill sizes="32px" className="object-cover" />}
+          </div>
+          <span className="line-clamp-1">{listing.title}</span>
+        </div>
+      );
+    },
+  },
   {
     accessorKey: "category",
     header: "Category",
@@ -220,8 +377,18 @@ const listingColumns: ColumnDef<AdminListing>[] = [
       </Badge>
     ),
   },
-  { id: "actions", header: () => <span className="sr-only">Actions</span>, cell: ({ row }) => <ListingModerationForm listing={row.original} /> },
-];
+  {
+    id: "actions",
+    header: () => <span className="sr-only">Actions</span>,
+    enableHiding: false,
+    cell: ({ row }) => (
+      <div className="flex justify-end">
+        <ListingActions listing={row.original} canManage={canManage} />
+      </div>
+    ),
+  },
+  ];
+}
 
 const orderColumns: ColumnDef<AdminOrder>[] = [
   { id: "item", accessorFn: (o) => o.listing.title, header: sortableHeader("Item") },
@@ -234,14 +401,35 @@ const orderColumns: ColumnDef<AdminOrder>[] = [
   { accessorKey: "status", header: sortableHeader("Status"), cell: ({ row }) => <Badge variant="outline">{row.original.status}</Badge> },
 ];
 
-const advertColumns: ColumnDef<AdminAdvertisement>[] = [
-  { id: "listing", accessorFn: (a) => a.listing.title, header: sortableHeader("Listing") },
-  { id: "owner", accessorFn: (a) => a.owner.name ?? a.owner.email, header: sortableHeader("Owner") },
-  { accessorKey: "plan", header: "Duration" },
-  { accessorKey: "amount", header: sortableHeader("Amount"), cell: ({ row }) => `KES ${row.original.amount.toLocaleString()}` },
-  { accessorKey: "status", header: sortableHeader("Status"), cell: ({ row }) => <Badge variant="outline">{row.original.status}</Badge> },
-  { id: "actions", header: () => <span className="sr-only">Actions</span>, cell: ({ row }) => <AdvertApprovalActions ad={row.original} /> },
-];
+function buildAdvertColumns(canManage: boolean): ColumnDef<AdminAdvertisement>[] {
+  return [
+    { id: "listing", accessorFn: (a) => a.listing.title, header: sortableHeader("Listing") },
+    { id: "owner", accessorFn: (a) => a.owner.name ?? a.owner.email, header: sortableHeader("Owner") },
+    { accessorKey: "plan", header: "Duration" },
+    {
+      accessorKey: "amount",
+      header: sortableHeader("Amount"),
+      cell: ({ row }) => `KES ${row.original.amount.toLocaleString()}`,
+    },
+    {
+      accessorKey: "status",
+      header: sortableHeader("Status"),
+      cell: ({ row }) => (
+        <Badge variant={row.original.status === "REJECTED" ? "destructive" : "outline"}>{row.original.status}</Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: () => <span className="sr-only">Actions</span>,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <div className="flex justify-end">
+          <AdvertApprovalActions ad={row.original} canManage={canManage} />
+        </div>
+      ),
+    },
+  ];
+}
 
 const paymentColumns: ColumnDef<AdminPayment>[] = [
   { accessorKey: "type", header: sortableHeader("Type") },
@@ -257,14 +445,24 @@ const paymentColumns: ColumnDef<AdminPayment>[] = [
   },
 ];
 
-export function AdminSection({ data }: { data: AdminData }) {
-  const { stats, users, listings, orders, adverts, payments } = data;
-  const [tab, setTab] = useState<Tab>("overview");
+export function AdminSection({ data, access }: { data: AdminData; access: AdminAccess }) {
+  const { stats, users, listings, orders, adverts, payments, roles } = data;
+  const { isSuperAdmin, permissions } = access;
+
+  const visibleTabs: Tab[] = isSuperAdmin
+    ? [...TABS]
+    : RESOURCE_TABS.filter((t) => hasPermission(permissions, t, "READ"));
+  const [tab, setTab] = useState<Tab>(visibleTabs[0] ?? "overview");
+  const [rolesModalOpen, setRolesModalOpen] = useState(false);
+  const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
+
+  const canManageListings = isSuperAdmin || hasPermission(permissions, "listings", "UPDATE");
+  const canManageAdverts = isSuperAdmin || hasPermission(permissions, "adverts", "UPDATE");
 
   return (
     <div className="flex flex-col gap-6 p-4">
       <nav className="flex overflow-x-auto rounded-full border border-zinc-200 dark:border-zinc-800 p-1">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t}
             type="button"
@@ -276,7 +474,7 @@ export function AdminSection({ data }: { data: AdminData }) {
             }`}
           >
             {TAB_LABELS[t]}
-            {t === "adverts" && stats.pendingApprovals > 0 && (
+            {t === "adverts" && !!stats?.pendingApprovals && (
               <span className="ml-1.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                 {stats.pendingApprovals}
               </span>
@@ -285,7 +483,7 @@ export function AdminSection({ data }: { data: AdminData }) {
         ))}
       </nav>
 
-      {tab === "overview" && (
+      {tab === "overview" && stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Users" value={stats.userCount} />
           <StatCard label="Listings" value={stats.listingCount} />
@@ -300,19 +498,59 @@ export function AdminSection({ data }: { data: AdminData }) {
       )}
 
       {tab === "users" && (
-        <DataTable columns={userColumns} data={users} filterColumnId="email" filterPlaceholder="Filter by email…" enableRowSelection={false} />
+        <div className="flex flex-col gap-3">
+          {isSuperAdmin && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setRolesModalOpen(true)}>
+                Roles
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPermissionsModalOpen(true)}>
+                Permissions
+              </Button>
+            </div>
+          )}
+          <DataTable
+            columns={buildUserColumns(roles, isSuperAdmin)}
+            data={users}
+            filterColumnId="email"
+            filterPlaceholder="Filter by email…"
+            enableRowSelection={false}
+            exportFilename="users"
+          />
+        </div>
       )}
 
       {tab === "listings" && (
-        <DataTable columns={listingColumns} data={listings} filterColumnId="title" filterPlaceholder="Filter by title…" enableRowSelection={false} />
+        <DataTable
+          columns={buildListingColumns(canManageListings)}
+          data={listings}
+          filterColumnId="title"
+          filterPlaceholder="Filter by title…"
+          enableRowSelection={false}
+          exportFilename="listings"
+        />
       )}
 
       {tab === "adverts" && (
-        <DataTable columns={advertColumns} data={adverts} filterColumnId="listing" filterPlaceholder="Filter by listing…" enableRowSelection={false} />
+        <DataTable
+          columns={buildAdvertColumns(canManageAdverts)}
+          data={adverts}
+          filterColumnId="listing"
+          filterPlaceholder="Filter by listing…"
+          enableRowSelection={false}
+          exportFilename="advertisements"
+        />
       )}
 
       {tab === "orders" && (
-        <DataTable columns={orderColumns} data={orders} filterColumnId="item" filterPlaceholder="Filter by item…" enableRowSelection={false} />
+        <DataTable
+          columns={orderColumns}
+          data={orders}
+          filterColumnId="item"
+          filterPlaceholder="Filter by item…"
+          enableRowSelection={false}
+          exportFilename="orders"
+        />
       )}
 
       {tab === "payments" && (
@@ -322,8 +560,12 @@ export function AdminSection({ data }: { data: AdminData }) {
           filterColumnId="description"
           filterPlaceholder="Filter by description…"
           enableRowSelection={false}
+          exportFilename="payments"
         />
       )}
+
+      {rolesModalOpen && <RolesModal roles={roles} onClose={() => setRolesModalOpen(false)} />}
+      {permissionsModalOpen && <PermissionsModal roles={roles} onClose={() => setPermissionsModalOpen(false)} />}
     </div>
   );
 }

@@ -107,3 +107,56 @@ export async function initiateStkPush(params: {
     checkoutRequestId: data.CheckoutRequestID,
   };
 }
+
+export type StkQueryResult =
+  | { outcome: "pending" }
+  | { outcome: "succeeded" }
+  | { outcome: "failed"; resultDesc: string };
+
+// Our own /api/mpesa/callback webhook is a passive listener — if Safaricom's callback never
+// reaches it (unreachable CallBackURL, transient network failure, etc.) a real, successfully
+// deducted payment can sit stuck on PENDING forever with nothing to correct it. This actively
+// asks Safaricom for the authoritative status of a checkout, so the frontend's status poll can
+// self-heal even when the webhook never fires.
+export async function queryStkPushStatus(checkoutRequestId: string): Promise<StkQueryResult> {
+  try {
+    const accessToken = await getAccessToken();
+    const timestamp = buildTimestamp();
+    const shortcode = process.env.MPESA_SHORTCODE!;
+
+    const res = await fetch(`${BASE_URL}/mpesa/stkpushquery/v1/query`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        BusinessShortCode: shortcode,
+        Password: buildPassword(timestamp),
+        Timestamp: timestamp,
+        CheckoutRequestID: checkoutRequestId,
+      }),
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+
+    // Safaricom returns a non-2xx with this error code while the transaction is still being
+    // processed on the customer's phone — not a failure, just "ask again later".
+    if (!res.ok) {
+      if (data?.errorCode === "500.001.1001") return { outcome: "pending" };
+      return { outcome: "pending" };
+    }
+
+    const resultCode = Number(data.ResultCode);
+    if (resultCode === 0) return { outcome: "succeeded" };
+    if (Number.isFinite(resultCode)) {
+      return { outcome: "failed", resultDesc: data.ResultDesc || "Payment was not completed." };
+    }
+    return { outcome: "pending" };
+  } catch {
+    // Network hiccup querying Safaricom — stay pending and let the next poll tick retry rather
+    // than risk marking a possibly-successful payment as failed.
+    return { outcome: "pending" };
+  }
+}

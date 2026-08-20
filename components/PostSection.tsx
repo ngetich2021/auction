@@ -35,6 +35,7 @@ export function PostSection({ session }: { session: Session | null }) {
   const [formOpen, setFormOpen] = useState(false);
   const [opening, startOpening] = useTransition();
   const [listingStatus, setListingStatus] = useState<string | null>(null);
+  const [failureReason, setFailureReason] = useState<string | null>(null);
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [seenListingId, setSeenListingId] = useState<string | null>(null);
   const imagesInputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +57,7 @@ export function PostSection({ session }: { session: Session | null }) {
         if (res.ok) {
           const data = await res.json();
           setListingStatus(data.status);
+          setFailureReason(data.failureReason ?? null);
           if (data.status !== "PENDING") {
             clearInterval(pollId);
             return;
@@ -72,6 +74,14 @@ export function PostSection({ session }: { session: Session | null }) {
     return () => clearInterval(pollId);
   }, [activeListingId]);
 
+  // Payment succeeded — thank the seller, then close the form on its own instead of leaving
+  // them to dismiss it manually.
+  useEffect(() => {
+    if (listingStatus !== "AVAILABLE") return;
+    const timer = setTimeout(() => setFormOpen(false), 2000);
+    return () => clearTimeout(timer);
+  }, [listingStatus]);
+
   if (!session) {
     return <SignInPrompt message="Sign in to post a listing." />;
   }
@@ -82,6 +92,12 @@ export function PostSection({ session }: { session: Session | null }) {
         router.push("/settings");
         return;
       }
+      // Reset any leftover status from a previous submission so a stale "thank you" or error
+      // message doesn't flash when the form is reopened. seenListingId is left as-is so the
+      // activeListingId-tracking effect below doesn't mistake this for a new submission.
+      setListingStatus(null);
+      setFailureReason(null);
+      setPollTimedOut(false);
       setFormOpen(true);
     });
   }
@@ -282,25 +298,31 @@ export function PostSection({ session }: { session: Session | null }) {
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || (listingStatus === "PENDING" && !pollTimedOut)}
           className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
         >
-          {pending ? "Starting payment…" : `Pay KES ${LISTING_POST_FEE_KES} & post`}
+          {pending
+            ? "Starting payment…"
+            : listingStatus === "PENDING" && !pollTimedOut
+              ? "Waiting for payment…"
+              : `Pay KES ${LISTING_POST_FEE_KES} & post`}
         </button>
 
         {listingStatus && (
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
             {listingStatus === "PENDING" && pollTimedOut && (
               <p className="text-red-600 dark:text-red-400">
-                We couldn&apos;t confirm your payment. If you didn&apos;t get a prompt on your phone, the request
-                failed to reach it — try again.
+                {failureReason ??
+                  "We're still confirming your payment — if money left your account, your listing will go live automatically once M-Pesa confirms it. Reopen this page in a minute to check."}
               </p>
             )}
             {listingStatus === "PENDING" && !pollTimedOut && (
               <p>Check your phone and enter your M-Pesa PIN to complete the KES {LISTING_POST_FEE_KES} payment…</p>
             )}
             {listingStatus === "AVAILABLE" && (
-              <p className="text-emerald-600 dark:text-emerald-400">Payment received. Your listing is now live.</p>
+              <p className="text-emerald-600 dark:text-emerald-400">
+                Thank you! Payment received and your listing is now live. Closing…
+              </p>
             )}
           </div>
         )}

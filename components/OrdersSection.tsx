@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 import type { Session } from "next-auth";
 import { useSingleFlightAction } from "@/hooks/useSingleFlightAction";
 import { cancelOrder } from "@/lib/actions/orders";
 import { SignInPrompt } from "@/components/ui/SignInPrompt";
+import { DataTable } from "@/components/ui/data-table";
 
 type OrderStatus = "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "COMPLETED";
 
@@ -57,80 +59,97 @@ function CancelButton({ orderId }: { orderId: string }) {
   );
 }
 
+const purchaseColumns: ColumnDef<BuyerOrder>[] = [
+  {
+    accessorKey: "listing.title",
+    id: "item",
+    header: "Item",
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
+          {row.original.listing.images[0] && (
+            <Image src={row.original.listing.images[0]} alt="" fill className="object-cover" />
+          )}
+        </div>
+        <span className="line-clamp-1">{row.original.listing.title}</span>
+      </div>
+    ),
+  },
+  { accessorKey: "quantity", header: "Qty" },
+  {
+    accessorKey: "totalAmount",
+    header: "Total",
+    cell: ({ row }) => <span>KES {row.original.totalAmount.toLocaleString()}</span>,
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => <StatusBadge status={row.original.status} />,
+  },
+  {
+    id: "actions",
+    header: () => <span className="sr-only">Actions</span>,
+    enableHiding: false,
+    cell: ({ row }) =>
+      row.original.status === "PENDING" || row.original.status === "FAILED" ? (
+        <CancelButton orderId={row.original.id} />
+      ) : (
+        <span className="text-xs text-muted-foreground">—</span>
+      ),
+  },
+];
+
+const saleColumns: ColumnDef<SellerOrder>[] = [
+  {
+    accessorKey: "listing.title",
+    id: "item",
+    header: "Item",
+    cell: ({ row }) => <span className="line-clamp-1">{row.original.listing.title}</span>,
+  },
+  {
+    accessorKey: "buyer.name",
+    id: "buyer",
+    header: "Buyer",
+    cell: ({ row }) => <span>{row.original.buyer.name ?? row.original.buyer.email}</span>,
+  },
+  { accessorKey: "quantity", header: "Qty" },
+  {
+    accessorKey: "totalAmount",
+    header: "Total",
+    cell: ({ row }) => <span>KES {row.original.totalAmount.toLocaleString()}</span>,
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => <StatusBadge status={row.original.status} />,
+  },
+];
+
 function PurchasesTable({ orders }: { orders: BuyerOrder[] }) {
-  if (orders.length === 0) {
-    return <p className="p-6 text-center text-sm text-zinc-500">You have not placed any orders yet.</p>;
-  }
   return (
-    <div className="overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-400">
-            <th className="px-3 py-2">Item</th>
-            <th className="px-3 py-2">Qty</th>
-            <th className="px-3 py-2">Total</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((order) => (
-            <tr key={order.id} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0">
-              <td className="flex items-center gap-2 px-3 py-2">
-                <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                  {order.listing.images[0] && (
-                    <Image src={order.listing.images[0]} alt="" fill className="object-cover" />
-                  )}
-                </div>
-                <span className="line-clamp-1">{order.listing.title}</span>
-              </td>
-              <td className="px-3 py-2">{order.quantity}</td>
-              <td className="px-3 py-2">KES {order.totalAmount.toLocaleString()}</td>
-              <td className="px-3 py-2">
-                <StatusBadge status={order.status} />
-              </td>
-              <td className="px-3 py-2">
-                {(order.status === "PENDING" || order.status === "FAILED") && <CancelButton orderId={order.id} />}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      columns={purchaseColumns}
+      data={orders}
+      filterColumnId="item"
+      filterPlaceholder="Filter by item…"
+      emptyMessage="You have not placed any orders yet."
+      enableRowSelection={false}
+      exportFilename="my-purchases"
+    />
   );
 }
 
 function SalesTable({ orders }: { orders: SellerOrder[] }) {
-  if (orders.length === 0) {
-    return <p className="p-6 text-center text-sm text-zinc-500">No one has ordered your listings yet.</p>;
-  }
   return (
-    <div className="overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-800">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-400">
-            <th className="px-3 py-2">Item</th>
-            <th className="px-3 py-2">Buyer</th>
-            <th className="px-3 py-2">Qty</th>
-            <th className="px-3 py-2">Total</th>
-            <th className="px-3 py-2">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((order) => (
-            <tr key={order.id} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0">
-              <td className="px-3 py-2">{order.listing.title}</td>
-              <td className="px-3 py-2">{order.buyer.name ?? order.buyer.email}</td>
-              <td className="px-3 py-2">{order.quantity}</td>
-              <td className="px-3 py-2">KES {order.totalAmount.toLocaleString()}</td>
-              <td className="px-3 py-2">
-                <StatusBadge status={order.status} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      columns={saleColumns}
+      data={orders}
+      filterColumnId="item"
+      filterPlaceholder="Filter by item…"
+      emptyMessage="No one has ordered your listings yet."
+      enableRowSelection={false}
+      exportFilename="my-sales"
+    />
   );
 }
 

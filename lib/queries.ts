@@ -1,19 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { LISTING_POST_FEE_KES } from "@/lib/validations/listing";
+import { haversineKm } from "@/lib/geo";
 import type { ListingCategory, Prisma } from "@prisma/client";
-
-const EARTH_RADIUS_KM = 6371;
-
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 function boundingBox(lat: number, lng: number, radiusKm: number) {
   const latDelta = radiusKm / 111;
@@ -182,7 +171,7 @@ export async function getUserAdvertisements(ownerId: string) {
 export async function getActivePromoVideos() {
   const ads = await prisma.advertisement.findMany({
     where: { status: "ACTIVE", endsAt: { gt: new Date() }, videoUrl: { not: null } },
-    include: { listing: { select: { id: true, title: true, price: true, category: true } } },
+    include: { listing: { include: listingWithRelations } },
     orderBy: { startsAt: "desc" },
     take: 10,
   });
@@ -190,12 +179,13 @@ export async function getActivePromoVideos() {
   return ads.map((ad, index) => ({
     id: ad.id,
     number: index + 1,
-    title: ad.listing.title,
     videoUrl: ad.videoUrl!,
-    videoSource: ad.videoSource!,
-    listingId: ad.listing.id,
-    price: ad.listing.price,
-    category: ad.listing.category,
+    listing: {
+      ...omitPaymentFields(ad.listing),
+      images: parseListingImages(ad.listing.images),
+      isBoosted: true,
+      distanceKm: null as number | null,
+    },
   }));
 }
 
@@ -269,7 +259,16 @@ export async function getAdminStats() {
 export async function getAllUsersForAdmin() {
   return prisma.user.findMany({
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, email: true, image: true, role: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+      role: true,
+      createdAt: true,
+      customRoleId: true,
+      customRole: { select: { id: true, name: true } },
+    },
   });
 }
 
@@ -308,6 +307,20 @@ export async function getAllAdvertisementsForAdmin() {
     orderBy: { createdAt: "desc" },
     take: 200,
   });
+}
+
+export async function getAllRolesForAdmin() {
+  const roles = await prisma.customRole.findMany({
+    include: { permissions: { select: { resource: true, action: true } }, _count: { select: { users: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  return roles.map((role) => ({
+    id: role.id,
+    name: role.name,
+    description: role.description,
+    userCount: role._count.users,
+    permissions: role.permissions,
+  }));
 }
 
 export type AdminPayment = {

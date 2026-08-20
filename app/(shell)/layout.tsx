@@ -6,7 +6,7 @@ import { NavBar } from "@/components/NavBar";
 export default async function ShellLayout({ children }: { children: React.ReactNode }) {
   const [session, promoVideos] = await Promise.all([auth(), getActivePromoVideos()]);
   const isLoggedIn = !!session?.user;
-  const isAdmin = session?.user.role === "ADMIN";
+  const isAdmin = session?.user.role === "ADMIN" || !!session?.user.customRoleId;
 
   return (
     <div className="flex min-h-screen flex-1 flex-col">

@@ -9,6 +9,9 @@ import { CATEGORY_LABELS, LISTING_CATEGORIES } from "@/lib/validations/listing";
 import type { ClientListing, ListingCategory } from "@/types/listing";
 import type { LatLng } from "@/components/map/LeafletMap";
 
+const DEFAULT_RADIUS_KM = 25;
+const MAX_RADIUS_KM = 500;
+
 export function BrowseSection({
   initialListings,
   initialTotal,
@@ -21,6 +24,7 @@ export function BrowseSection({
   const [listings, setListings] = useState(initialListings);
   const [total, setTotal] = useState(initialTotal);
   const [location, setLocation] = useState<LatLng | null>(null);
+  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ListingCategory | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,7 +39,7 @@ export function BrowseSection({
     if (location) {
       params.set("lat", String(location.latitude));
       params.set("lng", String(location.longitude));
-      params.set("radius", "25");
+      params.set("radius", String(Math.min(Math.max(radiusKm || DEFAULT_RADIUS_KM, 1), MAX_RADIUS_KM)));
     }
     try {
       const res = await fetch(`/api/listings?${params.toString()}`);
@@ -48,7 +52,7 @@ export function BrowseSection({
     } finally {
       setLoading(false);
     }
-  }, [category, search, location]);
+  }, [category, search, location, radiusKm]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -67,6 +71,20 @@ export function BrowseSection({
           mapSubtitle="or find items near you"
           allowClear
         />
+        {location && (
+          <label className="mt-2 flex items-center gap-2 text-sm">
+            Search radius
+            <input
+              type="number"
+              min={1}
+              max={MAX_RADIUS_KM}
+              value={radiusKm}
+              onChange={(e) => setRadiusKm(Number(e.target.value))}
+              className="w-20 rounded-full border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+            />
+            km
+          </label>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 px-4 pt-4 sm:flex-row sm:items-center">

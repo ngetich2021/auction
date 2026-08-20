@@ -44,11 +44,7 @@ enum AdStatus {
   ACTIVE
   EXPIRED
   CANCELLED
-}
-
-enum VideoSource {
-  YOUTUBE
-  UPLOAD
+  REJECTED
 }
 
 model User {
@@ -60,6 +56,9 @@ model User {
   phone         String?
   role          Role      @default(USER)
 
+  customRoleId String?
+  customRole   CustomRole? @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+
   accounts      Account[]
   sessions      Session[]
   listings      Listing[]
@@ -70,7 +69,36 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([customRoleId])
   @@map("users")
+}
+
+model CustomRole {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String?
+
+  users       User[]
+  permissions RolePermission[]
+
+  createdAt DateTime @default(now())
+
+  @@map("roles")
+}
+
+model RolePermission {
+  id     String     @id @default(cuid())
+  role   CustomRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId String
+
+  // resource: "users" | "listings" | "adverts" | "orders" | "payments"
+  resource String
+  // action: "CREATE" | "READ" | "UPDATE" | "DELETE"
+  action String
+
+  @@unique([roleId, resource, action])
+  @@index([roleId])
+  @@map("role_permissions")
 }
 
 model Account {
@@ -181,9 +209,9 @@ model Advertisement {
   plan   String
   amount Float
   status AdStatus @default(PENDING)
+  adminNote String?
 
-  videoSource VideoSource?
-  videoUrl    String?
+  videoUrl String?
 
   startsAt DateTime?
   endsAt   DateTime?
@@ -191,6 +219,7 @@ model Advertisement {
   mpesaCheckoutRequestId String?
   mpesaReceipt           String?
   failureReason          String?
+  pendingExtensionDays   Int?
 
   createdAt DateTime @default(now())
 

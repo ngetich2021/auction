@@ -17,6 +17,7 @@ export async function createMover(_prevState: ActionState, formData: FormData): 
     vehicleType: formData.get("vehicleType"),
     description: formData.get("description"),
     phone: formData.get("phone"),
+    address: formData.get("address"),
     latitude: formData.get("latitude"),
     longitude: formData.get("longitude"),
   });
@@ -50,6 +51,7 @@ export async function createMover(_prevState: ActionState, formData: FormData): 
       description: result.data.description || null,
       phone: result.data.phone,
       image: imageUrl,
+      address: result.data.address || null,
       latitude: result.data.latitude,
       longitude: result.data.longitude,
     },

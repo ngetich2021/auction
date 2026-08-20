@@ -40,6 +40,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = user.id;
         session.user.role = (user as { role?: "USER" | "ADMIN" }).role ?? "USER";
         session.user.phone = (user as { phone?: string | null }).phone ?? null;
+
+        const customRoleId = (user as { customRoleId?: string | null }).customRoleId ?? null;
+        session.user.customRoleId = customRoleId;
+        if (customRoleId) {
+          const role = await prisma.customRole.findUnique({
+            where: { id: customRoleId },
+            include: { permissions: { select: { resource: true, action: true } } },
+          });
+          session.user.customRoleName = role?.name ?? null;
+          session.user.permissions = role?.permissions ?? [];
+        } else {
+          session.user.customRoleName = null;
+          session.user.permissions = [];
+        }
       }
       return session;
     },

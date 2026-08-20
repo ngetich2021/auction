@@ -176,3 +176,42 @@ ALTER TABLE "listings" ADD COLUMN "mpesaCheckoutRequestId" TEXT;
 ALTER TABLE "listings" ADD COLUMN "mpesaReceipt" TEXT;
 ALTER TABLE "listings" ADD COLUMN "failureReason" TEXT;
 
+-- AlterTable
+ALTER TABLE "advertisements" ADD COLUMN "adminNote" TEXT;
+ALTER TABLE "advertisements" ADD COLUMN "pendingExtensionDays" INTEGER;
+
+-- CreateTable
+CREATE TABLE "roles" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
+CREATE TABLE "role_permissions" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "roleId" TEXT NOT NULL,
+    "resource" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    CONSTRAINT "role_permissions_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "roles_name_key" ON "roles"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "role_permissions_roleId_resource_action_key" ON "role_permissions"("roleId", "resource", "action");
+
+-- CreateIndex
+CREATE INDEX "role_permissions_roleId_idx" ON "role_permissions"("roleId");
+
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN "customRoleId" TEXT;
+
+-- CreateIndex
+CREATE INDEX "users_customRoleId_idx" ON "users"("customRoleId");
+
+-- AlterTable (YouTube video source removed — only uploaded videos remain)
+ALTER TABLE "advertisements" DROP COLUMN "videoSource";
+

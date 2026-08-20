@@ -5,6 +5,8 @@ import { useTransition } from "react";
 import type { Session } from "next-auth";
 import { MediaPlayer, type PromoVideo } from "@/components/MediaPlayer";
 import { ProfileMenu } from "@/components/ProfileMenu";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { InstallAppButton } from "@/components/InstallAppButton";
 
 export function Header({ session, promoVideos }: { session: Session | null; promoVideos: PromoVideo[] }) {
   const [signingIn, startSignIn] = useTransition();
@@ -12,6 +14,8 @@ export function Header({ session, promoVideos }: { session: Session | null; prom
   return (
     <header className="flex flex-col border-b border-zinc-900 dark:border-zinc-100">
       <div className="flex items-center justify-end gap-3 px-4 pt-3">
+        <InstallAppButton />
+        <ThemeToggle />
         {session?.user ? (
           <ProfileMenu user={session.user} />
         ) : (
@@ -30,7 +34,7 @@ export function Header({ session, promoVideos }: { session: Session | null; prom
         Auction items here, get more interested buyers
       </h1>
 
-      <MediaPlayer videos={promoVideos} />
+      <MediaPlayer videos={promoVideos} session={session} />
     </header>
   );
 }

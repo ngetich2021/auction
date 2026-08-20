@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import type { ClientMover } from "@/types/mover";
+import { CallButton } from "@/components/ui/CallButton";
 
 export function MoverCard({ mover }: { mover: ClientMover }) {
   const digitsOnly = mover.phone.replace(/\D/g, "");
@@ -26,12 +27,10 @@ export function MoverCard({ mover }: { mover: ClientMover }) {
         {mover.description && <p className="line-clamp-2 text-xs text-zinc-500">{mover.description}</p>}
         {mover.address && <p className="text-xs text-zinc-400">{mover.address}</p>}
         <div className="mt-auto flex items-center gap-2 pt-1">
-          <a
-            href={`tel:${mover.phone}`}
+          <CallButton
+            phone={mover.phone}
             className="flex-1 rounded-full bg-zinc-900 px-3 py-1.5 text-center text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
-          >
-            Call {mover.phone}
-          </a>
+          />
           <a
             href={`https://wa.me/${digitsOnly}`}
             target="_blank"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 import type { ActionState } from "@/lib/actions/types";
 
 /**
@@ -21,7 +21,9 @@ export function useSingleFlightAction(
   function guardedDispatch(formData: FormData) {
     if (inFlight.current || pending) return;
     inFlight.current = true;
-    dispatch(formData);
+    // Imperative callers (onClick, onCheckedChange, etc.) don't get the transition wrapping a
+    // <form action={...}> submission gets for free, so useActionState's dispatch needs it here.
+    startTransition(() => dispatch(formData));
   }
 
   return [state, guardedDispatch, pending] as const;

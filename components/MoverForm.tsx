@@ -14,6 +14,7 @@ import type { LatLng } from "@/components/map/LeafletMap";
 export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
   const [state, formAction, pending] = useSingleFlightAction(createMover);
   const [location, setLocation] = useState<LatLng | null>(null);
+  const [address, setAddress] = useState("");
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [clientErrors, setClientErrors] = useState<Record<string, string[]>>({});
@@ -38,6 +39,7 @@ export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
       vehicleType: formData.get("vehicleType"),
       description: formData.get("description"),
       phone: formData.get("phone"),
+      address: formData.get("address"),
       latitude: location?.latitude,
       longitude: location?.longitude,
     });
@@ -100,7 +102,13 @@ export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
 
       <div className="flex flex-col gap-1 text-sm">
         Location
-        <LocationPicker location={location} onChange={setLocation} />
+        <LocationPicker
+          location={location}
+          onChange={setLocation}
+          address={address}
+          onAddressChange={setAddress}
+        />
+        <FieldError messages={errors.address} />
         <FieldError messages={errors.latitude ?? errors.longitude} />
         <input type="hidden" name="latitude" value={location?.latitude ?? ""} />
         <input type="hidden" name="longitude" value={location?.longitude ?? ""} />

@@ -13,6 +13,7 @@ export const moverFieldsSchema = z
       .max(60, { error: "Vehicle type is too long" }),
     description: z.string().trim().max(300, { error: "Description is too long" }).optional().or(z.literal("")),
     phone: kenyanPhoneSchema,
+    address: z.string().trim().max(200, { error: "Address is too long" }).optional().or(z.literal("")),
   })
   .extend(coordinatesSchema.shape);
 
