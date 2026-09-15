@@ -1,11 +1,11 @@
 import { auth } from "@/lib/auth";
-import { getListings, getListingCount } from "@/lib/queries";
+import { getListings } from "@/lib/queries";
 import { BrowseSection } from "@/components/BrowseSection";
 
+export const revalidate = 5;
+
 export default async function BrowsePage() {
-  const session = await auth();
+  const [session, listings] = await Promise.all([auth(), getListings()]);
 
-  const [listings, total] = await Promise.all([getListings(), getListingCount()]);
-
-  return <BrowseSection initialListings={listings} initialTotal={total} session={session} />;
+  return <BrowseSection initialListings={listings} session={session} />;
 }

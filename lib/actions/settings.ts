@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { updateProfileSchema } from "@/lib/validations/settings";
@@ -26,5 +26,6 @@ export async function updateProfile(_prevState: ActionState, formData: FormData)
   });
 
   revalidatePath("/");
+  updateTag("admin-users");
   return { ok: true, message: "Profile updated." };
 }

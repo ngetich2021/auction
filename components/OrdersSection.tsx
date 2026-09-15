@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Session } from "next-auth";
@@ -170,25 +171,33 @@ export function OrdersSection({
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <div className="flex gap-2 text-sm">
-        <button
-          type="button"
-          onClick={() => setTab("purchases")}
-          className={`rounded-full px-3 py-1.5 ${
-            tab === "purchases" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "bg-zinc-100 dark:bg-zinc-800"
-          }`}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => setTab("purchases")}
+            className={`rounded-full px-3 py-1.5 ${
+              tab === "purchases" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "bg-zinc-100 dark:bg-zinc-800"
+            }`}
+          >
+            My purchases
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("sales")}
+            className={`rounded-full px-3 py-1.5 ${
+              tab === "sales" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "bg-zinc-100 dark:bg-zinc-800"
+            }`}
+          >
+            My sales
+          </button>
+        </div>
+        <Link
+          href={tab === "purchases" ? "/" : "/post"}
+          className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
         >
-          My purchases
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("sales")}
-          className={`rounded-full px-3 py-1.5 ${
-            tab === "sales" ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "bg-zinc-100 dark:bg-zinc-800"
-          }`}
-        >
-          My sales
-        </button>
+          {tab === "purchases" ? "Browse items" : "Post an item"}
+        </Link>
       </div>
 
       {tab === "purchases" ? <PurchasesTable orders={buyerOrders} /> : <SalesTable orders={sellerOrders} />}

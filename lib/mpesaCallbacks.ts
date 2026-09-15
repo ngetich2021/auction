@@ -153,3 +153,60 @@ export async function handleListingCallback(
     });
   }
 }
+
+// Shared shape for the near-identical blue-star badge callbacks below (Listing/Mover/Offer/Eatery).
+async function applyBadgeCallback(
+  model: { update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<unknown> },
+  id: string,
+  succeeded: boolean,
+  resultDesc: string | undefined,
+  receiptNumber: string | undefined
+) {
+  if (!succeeded) {
+    await model.update({
+      where: { id },
+      data: { badgeFailureReason: resultDesc ?? "Payment was not completed." },
+    });
+    return;
+  }
+  await model.update({
+    where: { id },
+    data: { badge: true, badgeReceipt: receiptNumber ?? null, badgeFailureReason: null },
+  });
+}
+
+export function handleListingBadgeCallback(
+  listing: { id: string },
+  succeeded: boolean,
+  resultDesc: string | undefined,
+  receiptNumber: string | undefined
+) {
+  return applyBadgeCallback(prisma.listing, listing.id, succeeded, resultDesc, receiptNumber);
+}
+
+export function handleMoverBadgeCallback(
+  mover: { id: string },
+  succeeded: boolean,
+  resultDesc: string | undefined,
+  receiptNumber: string | undefined
+) {
+  return applyBadgeCallback(prisma.mover, mover.id, succeeded, resultDesc, receiptNumber);
+}
+
+export function handleOfferBadgeCallback(
+  offer: { id: string },
+  succeeded: boolean,
+  resultDesc: string | undefined,
+  receiptNumber: string | undefined
+) {
+  return applyBadgeCallback(prisma.offer, offer.id, succeeded, resultDesc, receiptNumber);
+}
+
+export function handleEateryBadgeCallback(
+  eatery: { id: string },
+  succeeded: boolean,
+  resultDesc: string | undefined,
+  receiptNumber: string | undefined
+) {
+  return applyBadgeCallback(prisma.eatery, eatery.id, succeeded, resultDesc, receiptNumber);
+}

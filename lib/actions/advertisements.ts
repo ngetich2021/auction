@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { initiateStkPush, MpesaError } from "@/lib/mpesa";
@@ -81,6 +81,8 @@ export async function createAdvertisement(_prevState: ActionState, formData: For
   }
 
   revalidatePath("/");
+  updateTag("advertisements");
+  updateTag("admin-adverts");
   return {
     ok: true,
     message: "Check your phone to complete the M-Pesa payment.",
@@ -136,6 +138,8 @@ export async function extendAdvertisement(_prevState: ActionState, formData: For
   }
 
   revalidatePath("/");
+  updateTag("advertisements");
+  updateTag("admin-adverts");
   return {
     ok: true,
     message: "Check your phone to complete the M-Pesa payment for the extension.",
@@ -168,6 +172,8 @@ export async function cancelAdvertisement(_prevState: ActionState, formData: For
   });
 
   revalidatePath("/");
+  updateTag("advertisements");
+  updateTag("admin-adverts");
   return { ok: true, message: "Advertisement cancelled." };
 }
 
@@ -212,6 +218,9 @@ export async function approveAdvertisement(_prevState: ActionState, formData: Fo
   }
 
   revalidatePath("/");
+  updateTag("advertisements");
+  updateTag("admin-adverts");
+  updateTag("listings");
   return { ok: true, message: "Advertisement approved and now live." };
 }
 
@@ -260,6 +269,9 @@ export async function rejectAdvertisement(_prevState: ActionState, formData: For
   }
 
   revalidatePath("/");
+  updateTag("advertisements");
+  updateTag("admin-adverts");
+  updateTag("listings");
   return { ok: true, message: "Advertisement rejected." };
 }
 
@@ -304,5 +316,7 @@ export async function editRejectedAdvertisement(_prevState: ActionState, formDat
   });
 
   revalidatePath("/");
+  updateTag("advertisements");
+  updateTag("admin-adverts");
   return { ok: true, message: "Advertisement updated and resubmitted for approval." };
 }

@@ -1,34 +1,86 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import type { ColumnDef } from "@tanstack/react-table";
+import { MoreHorizontal, Star } from "lucide-react";
 import { useSingleFlightAction } from "@/hooks/useSingleFlightAction";
-import { setMoverActive } from "@/lib/actions/movers";
+import { setMoverActive, deleteMover, payForMoverBadge } from "@/lib/actions/movers";
 import { DataTable } from "@/components/ui/data-table";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/Modal";
+import { MoverForm } from "@/components/MoverForm";
+import { BadgeUpgradeMenuItem } from "@/components/ui/BadgeUpgrade";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { ClientMover } from "@/types/mover";
 
-function ToggleActiveButton({ mover }: { mover: ClientMover }) {
-  const [state, formAction, pending] = useSingleFlightAction(setMoverActive);
+function MoverRowActions({ mover }: { mover: ClientMover }) {
+  const [toggleState, toggleAction, togglePending] = useSingleFlightAction(setMoverActive);
+  const [deleteState, deleteAction, deletePending] = useSingleFlightAction(deleteMover);
+  const [editing, setEditing] = useState(false);
+
+  function toggleActive() {
+    const formData = new FormData();
+    formData.set("moverId", mover.id);
+    formData.set("active", mover.active ? "false" : "true");
+    toggleAction(formData);
+  }
+
+  function handleDelete() {
+    if (!window.confirm(`Delete "${mover.vehicleType}"? This cannot be undone.`)) return;
+    const formData = new FormData();
+    formData.set("moverId", mover.id);
+    deleteAction(formData);
+  }
+
+  const message = toggleState?.message ?? deleteState?.message;
+  const ok = toggleState?.ok ?? deleteState?.ok;
+
   return (
     <div className="flex flex-col items-end gap-1">
-      <form action={formAction} className="flex gap-1">
-        <input type="hidden" name="moverId" value={mover.id} />
-        <button
-          name="active"
-          value={mover.active ? "false" : "true"}
-          disabled={pending}
-          className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-xs disabled:opacity-50"
-        >
-          {pending ? "Saving…" : mover.active ? "Hide" : "Show"}
-        </button>
-      </form>
-      {state?.message && (
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon" disabled={togglePending || deletePending}>
+              <MoreHorizontal className="size-4" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setEditing(true)}>Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={toggleActive}>{mover.active ? "Hide" : "Show"}</DropdownMenuItem>
+          {!mover.badge && (
+            <BadgeUpgradeMenuItem
+              idField="moverId"
+              idValue={mover.id}
+              defaultPhone={mover.phone}
+              payAction={payForMoverBadge}
+              statusUrl={`/api/movers/${mover.id}/badge-status`}
+            />
+          )}
+          <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {message && (
         <p
-          role={state.ok ? "status" : "alert"}
-          className={`text-xs ${state.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+          role={ok ? "status" : "alert"}
+          className={`text-xs ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
         >
-          {state.message}
+          {message}
         </p>
+      )}
+      {editing && (
+        <Modal onClose={() => setEditing(false)}>
+          <MoverForm defaultPhone={mover.phone} mover={mover} />
+        </Modal>
       )}
     </div>
   );
@@ -43,7 +95,10 @@ const columns: ColumnDef<ClientMover>[] = [
         <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
           <Image src={row.original.image} alt="" fill className="object-cover" />
         </div>
-        <span className="line-clamp-1">{row.original.vehicleType}</span>
+        <span className="line-clamp-1 flex items-center gap-1">
+          {row.original.vehicleType}
+          {row.original.badge && <Star className="size-3.5 shrink-0 fill-blue-500 text-blue-500" />}
+        </span>
       </div>
     ),
   },
@@ -59,7 +114,7 @@ const columns: ColumnDef<ClientMover>[] = [
     enableHiding: false,
     cell: ({ row }) => (
       <div className="flex justify-end">
-        <ToggleActiveButton mover={row.original} />
+        <MoverRowActions mover={row.original} />
       </div>
     ),
   },

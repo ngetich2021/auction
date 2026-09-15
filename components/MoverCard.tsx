@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Star } from "lucide-react";
 import type { ClientMover } from "@/types/mover";
 import { CallButton } from "@/components/ui/CallButton";
 
@@ -23,7 +24,10 @@ export function MoverCard({ mover }: { mover: ClientMover }) {
           <h3 className="text-sm font-semibold">{mover.vehicleType}</h3>
           {mover.distanceKm != null && <span className="text-xs text-zinc-400">{mover.distanceKm.toFixed(1)} km</span>}
         </div>
-        <p className="text-xs text-zinc-500">{mover.owner.name ?? "Mover"}</p>
+        <p className="flex items-center gap-1 text-xs text-zinc-500">
+          {mover.owner.name ?? "Mover"}
+          {mover.badge && <Star className="size-3 shrink-0 fill-blue-500 text-blue-500" aria-label="Blue star badge" />}
+        </p>
         {mover.description && <p className="line-clamp-2 text-xs text-zinc-500">{mover.description}</p>}
         {mover.address && <p className="text-xs text-zinc-400">{mover.address}</p>}
         <div className="mt-auto flex items-center gap-2 pt-1">

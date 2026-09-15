@@ -5,6 +5,7 @@ export type ClientMover = {
   phone: string;
   image: string;
   active: boolean;
+  badge: boolean;
   latitude: number;
   longitude: number;
   address: string | null;

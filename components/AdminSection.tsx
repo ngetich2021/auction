@@ -3,11 +3,14 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Star } from "lucide-react";
 import { useSingleFlightAction } from "@/hooks/useSingleFlightAction";
 import { updateUserRole, adminModerateListing } from "@/lib/actions/admin";
 import { assignUserRole } from "@/lib/actions/roles";
 import { approveAdvertisement, rejectAdvertisement } from "@/lib/actions/advertisements";
+import { setMoverActive, deleteMover } from "@/lib/actions/movers";
+import { setOfferActive, deleteOffer } from "@/lib/actions/offers";
+import { setEateryActive, deleteEatery } from "@/lib/actions/eateries";
 import { VIDEO_NOT_PLAYING_REASON } from "@/lib/validations/advertisement";
 import { CATEGORY_LABELS, LISTING_POST_FEE_KES } from "@/lib/validations/listing";
 import { hasPermission, type SessionPermission } from "@/lib/permissions";
@@ -54,6 +57,7 @@ type AdminListing = {
   images: string[];
   category: ListingCategory;
   status: ListingStatus;
+  badge: boolean;
   paymentStatus: PaymentStatus;
   seller: { name: string | null; email: string };
 };
@@ -72,6 +76,35 @@ type AdminAdvertisement = {
   listing: { title: string };
   owner: { name: string | null; email: string };
 };
+type AdminMover = {
+  id: string;
+  vehicleType: string;
+  image: string;
+  phone: string;
+  active: boolean;
+  badge: boolean;
+  owner: { name: string | null; email: string };
+};
+type AdminOffer = {
+  id: string;
+  title: string;
+  shopName: string;
+  image: string;
+  phone: string;
+  active: boolean;
+  badge: boolean;
+  owner: { name: string | null; email: string };
+};
+type AdminEatery = {
+  id: string;
+  name: string;
+  foodType: string | null;
+  image: string;
+  phone: string;
+  active: boolean;
+  badge: boolean;
+  owner: { name: string | null; email: string };
+};
 
 export type AdminData = {
   stats: AdminStats | null;
@@ -81,9 +114,12 @@ export type AdminData = {
   adverts: AdminAdvertisement[];
   payments: AdminPayment[];
   roles: AdminRole[];
+  movers: AdminMover[];
+  offers: AdminOffer[];
+  eateries: AdminEatery[];
 };
 
-const TABS = ["overview", "users", "listings", "adverts", "orders", "payments"] as const;
+const TABS = ["overview", "users", "listings", "adverts", "orders", "payments", "movers", "offers", "eateries"] as const;
 type Tab = (typeof TABS)[number];
 const RESOURCE_TABS = ["users", "listings", "adverts", "orders", "payments"] as const;
 const TAB_LABELS: Record<Tab, string> = {
@@ -93,6 +129,9 @@ const TAB_LABELS: Record<Tab, string> = {
   adverts: "Adverts",
   orders: "Orders",
   payments: "Payments",
+  movers: "Movers",
+  offers: "Offers",
+  eateries: "Eateries",
 };
 
 function sortableHeader(label: string) {
@@ -308,6 +347,249 @@ function AdvertApprovalActions({ ad, canManage }: { ad: AdminAdvertisement; canM
   );
 }
 
+function MoverActions({ mover }: { mover: AdminMover }) {
+  const [toggleState, toggleAction, togglePending] = useSingleFlightAction(setMoverActive);
+  const [deleteState, deleteAction, deletePending] = useSingleFlightAction(deleteMover);
+
+  function toggleActive() {
+    const formData = new FormData();
+    formData.set("moverId", mover.id);
+    formData.set("active", mover.active ? "false" : "true");
+    toggleAction(formData);
+  }
+
+  function handleDelete() {
+    if (!window.confirm(`Delete "${mover.vehicleType}"? This cannot be undone.`)) return;
+    const formData = new FormData();
+    formData.set("moverId", mover.id);
+    deleteAction(formData);
+  }
+
+  const message = toggleState?.message ?? deleteState?.message;
+  const ok = toggleState?.ok ?? deleteState?.ok;
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <DropdownMenu>
+        <ActionsTrigger disabled={togglePending || deletePending} />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={toggleActive}>{mover.active ? "Hide" : "Show"}</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {message && (
+        <span className={`text-xs ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+          {message}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function OfferActions({ offer }: { offer: AdminOffer }) {
+  const [toggleState, toggleAction, togglePending] = useSingleFlightAction(setOfferActive);
+  const [deleteState, deleteAction, deletePending] = useSingleFlightAction(deleteOffer);
+
+  function toggleActive() {
+    const formData = new FormData();
+    formData.set("offerId", offer.id);
+    formData.set("active", offer.active ? "false" : "true");
+    toggleAction(formData);
+  }
+
+  function handleDelete() {
+    if (!window.confirm(`Delete "${offer.title}"? This cannot be undone.`)) return;
+    const formData = new FormData();
+    formData.set("offerId", offer.id);
+    deleteAction(formData);
+  }
+
+  const message = toggleState?.message ?? deleteState?.message;
+  const ok = toggleState?.ok ?? deleteState?.ok;
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <DropdownMenu>
+        <ActionsTrigger disabled={togglePending || deletePending} />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={toggleActive}>{offer.active ? "Hide" : "Show"}</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {message && (
+        <span className={`text-xs ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+          {message}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function EateryActions({ eatery }: { eatery: AdminEatery }) {
+  const [toggleState, toggleAction, togglePending] = useSingleFlightAction(setEateryActive);
+  const [deleteState, deleteAction, deletePending] = useSingleFlightAction(deleteEatery);
+
+  function toggleActive() {
+    const formData = new FormData();
+    formData.set("eateryId", eatery.id);
+    formData.set("active", eatery.active ? "false" : "true");
+    toggleAction(formData);
+  }
+
+  function handleDelete() {
+    if (!window.confirm(`Delete "${eatery.name}"? This cannot be undone.`)) return;
+    const formData = new FormData();
+    formData.set("eateryId", eatery.id);
+    deleteAction(formData);
+  }
+
+  const message = toggleState?.message ?? deleteState?.message;
+  const ok = toggleState?.ok ?? deleteState?.ok;
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <DropdownMenu>
+        <ActionsTrigger disabled={togglePending || deletePending} />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={toggleActive}>{eatery.active ? "Hide" : "Show"}</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {message && (
+        <span className={`text-xs ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+          {message}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const moverColumns: ColumnDef<AdminMover>[] = [
+  {
+    accessorKey: "vehicleType",
+    header: sortableHeader("Vehicle"),
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-muted">
+          <Image src={row.original.image} alt="" fill sizes="32px" className="object-cover" />
+        </div>
+        <span className="line-clamp-1">{row.original.vehicleType}</span>
+      </div>
+    ),
+  },
+  { id: "owner", accessorFn: (m) => m.owner.name ?? m.owner.email, header: sortableHeader("Owner") },
+  { accessorKey: "phone", header: "Phone" },
+  {
+    accessorKey: "active",
+    header: "Status",
+    cell: ({ row }) => <Badge variant={row.original.active ? "default" : "secondary"}>{row.original.active ? "Visible" : "Hidden"}</Badge>,
+  },
+  {
+    accessorKey: "badge",
+    header: "Badge",
+    cell: ({ row }) =>
+      row.original.badge ? <Star className="size-4 fill-blue-500 text-blue-500" aria-label="Blue star badge" /> : "—",
+  },
+  {
+    id: "actions",
+    header: () => <span className="sr-only">Actions</span>,
+    enableHiding: false,
+    cell: ({ row }) => (
+      <div className="flex justify-end">
+        <MoverActions mover={row.original} />
+      </div>
+    ),
+  },
+];
+
+const offerColumns: ColumnDef<AdminOffer>[] = [
+  {
+    accessorKey: "title",
+    header: sortableHeader("Offer"),
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-muted">
+          <Image src={row.original.image} alt="" fill sizes="32px" className="object-cover" />
+        </div>
+        <div className="flex flex-col">
+          <span className="line-clamp-1">{row.original.title}</span>
+          <span className="text-xs text-muted-foreground">{row.original.shopName}</span>
+        </div>
+      </div>
+    ),
+  },
+  { id: "owner", accessorFn: (o) => o.owner.name ?? o.owner.email, header: sortableHeader("Owner") },
+  { accessorKey: "phone", header: "Phone" },
+  {
+    accessorKey: "active",
+    header: "Status",
+    cell: ({ row }) => <Badge variant={row.original.active ? "default" : "secondary"}>{row.original.active ? "Visible" : "Hidden"}</Badge>,
+  },
+  {
+    accessorKey: "badge",
+    header: "Badge",
+    cell: ({ row }) =>
+      row.original.badge ? <Star className="size-4 fill-blue-500 text-blue-500" aria-label="Blue star badge" /> : "—",
+  },
+  {
+    id: "actions",
+    header: () => <span className="sr-only">Actions</span>,
+    enableHiding: false,
+    cell: ({ row }) => (
+      <div className="flex justify-end">
+        <OfferActions offer={row.original} />
+      </div>
+    ),
+  },
+];
+
+const eateryColumns: ColumnDef<AdminEatery>[] = [
+  {
+    accessorKey: "name",
+    header: sortableHeader("Eatery"),
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-muted">
+          <Image src={row.original.image} alt="" fill sizes="32px" className="object-cover" />
+        </div>
+        <div className="flex flex-col">
+          <span className="line-clamp-1">{row.original.name}</span>
+          {row.original.foodType && <span className="text-xs text-muted-foreground">{row.original.foodType}</span>}
+        </div>
+      </div>
+    ),
+  },
+  { id: "owner", accessorFn: (e) => e.owner.name ?? e.owner.email, header: sortableHeader("Owner") },
+  { accessorKey: "phone", header: "Phone" },
+  {
+    accessorKey: "active",
+    header: "Status",
+    cell: ({ row }) => <Badge variant={row.original.active ? "default" : "secondary"}>{row.original.active ? "Visible" : "Hidden"}</Badge>,
+  },
+  {
+    accessorKey: "badge",
+    header: "Badge",
+    cell: ({ row }) =>
+      row.original.badge ? <Star className="size-4 fill-blue-500 text-blue-500" aria-label="Blue star badge" /> : "—",
+  },
+  {
+    id: "actions",
+    header: () => <span className="sr-only">Actions</span>,
+    enableHiding: false,
+    cell: ({ row }) => (
+      <div className="flex justify-end">
+        <EateryActions eatery={row.original} />
+      </div>
+    ),
+  },
+];
+
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-3">
@@ -378,6 +660,12 @@ function buildListingColumns(canManage: boolean): ColumnDef<AdminListing>[] {
     ),
   },
   {
+    accessorKey: "badge",
+    header: "Badge",
+    cell: ({ row }) =>
+      row.original.badge ? <Star className="size-4 fill-blue-500 text-blue-500" aria-label="Blue star badge" /> : "—",
+  },
+  {
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
     enableHiding: false,
@@ -446,7 +734,7 @@ const paymentColumns: ColumnDef<AdminPayment>[] = [
 ];
 
 export function AdminSection({ data, access }: { data: AdminData; access: AdminAccess }) {
-  const { stats, users, listings, orders, adverts, payments, roles } = data;
+  const { stats, users, listings, orders, adverts, payments, roles, movers, offers, eateries } = data;
   const { isSuperAdmin, permissions } = access;
 
   const visibleTabs: Tab[] = isSuperAdmin
@@ -561,6 +849,39 @@ export function AdminSection({ data, access }: { data: AdminData; access: AdminA
           filterPlaceholder="Filter by description…"
           enableRowSelection={false}
           exportFilename="payments"
+        />
+      )}
+
+      {tab === "movers" && (
+        <DataTable
+          columns={moverColumns}
+          data={movers}
+          filterColumnId="vehicleType"
+          filterPlaceholder="Filter by vehicle…"
+          enableRowSelection={false}
+          exportFilename="movers"
+        />
+      )}
+
+      {tab === "offers" && (
+        <DataTable
+          columns={offerColumns}
+          data={offers}
+          filterColumnId="title"
+          filterPlaceholder="Filter by offer…"
+          enableRowSelection={false}
+          exportFilename="offers"
+        />
+      )}
+
+      {tab === "eateries" && (
+        <DataTable
+          columns={eateryColumns}
+          data={eateries}
+          filterColumnId="name"
+          filterPlaceholder="Filter by eatery…"
+          enableRowSelection={false}
+          exportFilename="eateries"
         />
       )}
 

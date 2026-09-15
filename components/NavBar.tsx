@@ -13,7 +13,9 @@ export function NavBar({ isLoggedIn, isAdmin }: { isLoggedIn: boolean; isAdmin: 
 
   const items: { href: string; label: string }[] = [
     { href: "/", label: "browse" },
+    { href: "/offers", label: "offers" },
     { href: "/movers", label: "movers" },
+    { href: "/eateries", label: "eateries" },
     { href: "/post", label: "post" },
     { href: "/advertise", label: "advertise" },
     ...(isLoggedIn ? [{ href: "/orders", label: "orders" }] : []),

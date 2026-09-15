@@ -65,6 +65,8 @@ model User {
   orders        Order[]         @relation("BuyerOrders")
   ads           Advertisement[]
   movers        Mover[]
+  offers        Offer[]
+  eateries      Eatery[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -160,6 +162,11 @@ model Listing {
   mpesaReceipt           String?
   failureReason          String?
 
+  badge                  Boolean @default(false)
+  badgeCheckoutRequestId String?
+  badgeReceipt           String?
+  badgeFailureReason     String?
+
   seller   User   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   sellerId String
 
@@ -243,10 +250,74 @@ model Mover {
   longitude Float
   address   String?
 
+  badge                  Boolean @default(false)
+  badgeCheckoutRequestId String?
+  badgeReceipt           String?
+  badgeFailureReason     String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ownerId])
   @@index([active])
   @@map("movers")
+}
+
+model Offer {
+  id          String  @id @default(cuid())
+  owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId     String
+  shopName    String
+  title       String
+  description String?
+  discount    String?
+  phone       String
+  image       String
+  active      Boolean @default(true)
+
+  latitude  Float
+  longitude Float
+  address   String?
+
+  expiresAt DateTime?
+
+  badge                  Boolean @default(false)
+  badgeCheckoutRequestId String?
+  badgeReceipt           String?
+  badgeFailureReason     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([active])
+  @@map("offers")
+}
+
+model Eatery {
+  id          String  @id @default(cuid())
+  owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId     String
+  name        String
+  foodType    String?
+  description String?
+  phone       String
+  image       String
+  active      Boolean @default(true)
+
+  latitude  Float
+  longitude Float
+  address   String?
+
+  badge                  Boolean @default(false)
+  badgeCheckoutRequestId String?
+  badgeReceipt           String?
+  badgeFailureReason     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([active])
+  @@map("eateries")
 }

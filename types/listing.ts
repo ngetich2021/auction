@@ -19,6 +19,7 @@ export type ClientListing = {
   quantity: number;
   images: string[];
   status: ListingStatus;
+  badge: boolean;
   latitude: number;
   longitude: number;
   address: string | null;

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { updateUserRoleSchema, moderateListingSchema } from "@/lib/validations/admin";
@@ -46,6 +46,7 @@ export async function updateUserRole(_prevState: ActionState, formData: FormData
 
   await prisma.user.update({ where: { id: result.data.userId }, data: { role: result.data.role } });
   revalidatePath("/");
+  updateTag("admin-users");
   return { ok: true, message: "User role updated." };
 }
 
@@ -68,5 +69,7 @@ export async function adminModerateListing(_prevState: ActionState, formData: Fo
     data: { status: result.data.status },
   });
   revalidatePath("/");
+  updateTag("listings");
+  updateTag("admin-listings");
   return { ok: true, message: "Listing updated." };
 }

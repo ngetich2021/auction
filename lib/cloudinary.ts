@@ -29,3 +29,11 @@ export function uploadListingImage(file: File): Promise<string> {
 export function uploadMoverImage(file: File): Promise<string> {
   return uploadFile(file, "disposals/movers");
 }
+
+export function uploadOfferImage(file: File): Promise<string> {
+  return uploadFile(file, "disposals/offers");
+}
+
+export function uploadEateryImage(file: File): Promise<string> {
+  return uploadFile(file, "disposals/eateries");
+}

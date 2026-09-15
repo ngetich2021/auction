@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Star } from "lucide-react";
 import { CATEGORY_LABELS } from "@/lib/validations/listing";
 import type { ClientListing } from "@/types/listing";
 
@@ -33,7 +34,10 @@ export function ItemCard({ listing, onSelect }: { listing: ClientListing; onSele
       </div>
       <div className="flex flex-1 flex-col gap-1 p-3">
         <span className="text-[10px] uppercase tracking-wide text-zinc-400">{CATEGORY_LABELS[listing.category]}</span>
-        <h3 className="line-clamp-2 text-sm font-medium">{listing.title}</h3>
+        <h3 className="line-clamp-2 flex items-center gap-1 text-sm font-medium">
+          {listing.title}
+          {listing.badge && <Star className="size-3.5 shrink-0 fill-blue-500 text-blue-500" aria-label="Blue star badge" />}
+        </h3>
         <div className="mt-auto flex items-center justify-between pt-1">
           <span className="text-sm font-semibold">KES {listing.price.toLocaleString()}</span>
           {listing.distanceKm != null && (

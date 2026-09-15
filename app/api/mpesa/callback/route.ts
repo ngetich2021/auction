@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleOrderCallback, handleAdvertisementCallback, handleListingCallback } from "@/lib/mpesaCallbacks";
+import {
+  handleOrderCallback,
+  handleAdvertisementCallback,
+  handleListingCallback,
+  handleListingBadgeCallback,
+  handleMoverBadgeCallback,
+  handleOfferBadgeCallback,
+  handleEateryBadgeCallback,
+} from "@/lib/mpesaCallbacks";
 
 type StkCallbackItem = { Name: string; Value?: string | number };
 type StkCallback = {
@@ -47,6 +55,30 @@ export async function POST(request: Request) {
     const listing = await prisma.listing.findFirst({ where: { mpesaCheckoutRequestId: checkoutRequestId } });
     if (listing) {
       await handleListingCallback(listing, succeeded, callback.ResultDesc, receiptNumber);
+      return NextResponse.json(ACK);
+    }
+
+    const listingBadge = await prisma.listing.findFirst({ where: { badgeCheckoutRequestId: checkoutRequestId } });
+    if (listingBadge) {
+      await handleListingBadgeCallback(listingBadge, succeeded, callback.ResultDesc, receiptNumber);
+      return NextResponse.json(ACK);
+    }
+
+    const moverBadge = await prisma.mover.findFirst({ where: { badgeCheckoutRequestId: checkoutRequestId } });
+    if (moverBadge) {
+      await handleMoverBadgeCallback(moverBadge, succeeded, callback.ResultDesc, receiptNumber);
+      return NextResponse.json(ACK);
+    }
+
+    const offerBadge = await prisma.offer.findFirst({ where: { badgeCheckoutRequestId: checkoutRequestId } });
+    if (offerBadge) {
+      await handleOfferBadgeCallback(offerBadge, succeeded, callback.ResultDesc, receiptNumber);
+      return NextResponse.json(ACK);
+    }
+
+    const eateryBadge = await prisma.eatery.findFirst({ where: { badgeCheckoutRequestId: checkoutRequestId } });
+    if (eateryBadge) {
+      await handleEateryBadgeCallback(eateryBadge, succeeded, callback.ResultDesc, receiptNumber);
     }
 
     return NextResponse.json(ACK);

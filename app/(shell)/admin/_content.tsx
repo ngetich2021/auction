@@ -8,6 +8,9 @@ import {
   getAllAdvertisementsForAdmin,
   getAllPaymentsForAdmin,
   getAllRolesForAdmin,
+  getAllMoversForAdmin,
+  getAllOffersForAdmin,
+  getAllEateriesForAdmin,
 } from "@/lib/queries";
 import { hasPermission } from "@/lib/permissions";
 import { AdminSection } from "@/components/AdminSection";
@@ -24,7 +27,7 @@ export async function AdminContent() {
   const canRead = (resource: "users" | "listings" | "adverts" | "orders" | "payments") =>
     isSuperAdmin || hasPermission(permissions, resource, "READ");
 
-  const [stats, users, listings, orders, adverts, payments, roles] = await Promise.all([
+  const [stats, users, listings, orders, adverts, payments, roles, movers, offers, eateries] = await Promise.all([
     isSuperAdmin ? getAdminStats() : null,
     canRead("users") ? getAllUsersForAdmin() : [],
     canRead("listings") ? getAllListingsForAdmin() : [],
@@ -32,11 +35,14 @@ export async function AdminContent() {
     canRead("adverts") ? getAllAdvertisementsForAdmin() : [],
     canRead("payments") ? getAllPaymentsForAdmin() : [],
     isSuperAdmin ? getAllRolesForAdmin() : [],
+    isSuperAdmin ? getAllMoversForAdmin() : [],
+    isSuperAdmin ? getAllOffersForAdmin() : [],
+    isSuperAdmin ? getAllEateriesForAdmin() : [],
   ]);
 
   return (
     <AdminSection
-      data={{ stats, users, listings, orders, adverts, payments, roles }}
+      data={{ stats, users, listings, orders, adverts, payments, roles, movers, offers, eateries }}
       access={{ isSuperAdmin, permissions }}
     />
   );

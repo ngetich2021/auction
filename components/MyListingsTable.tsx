@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Loader2, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, Loader2, MoreHorizontal, Star } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,8 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/ui/data-table";
+import { BadgeUpgradeMenuItem } from "@/components/ui/BadgeUpgrade";
 import { useSingleFlightAction } from "@/hooks/useSingleFlightAction";
-import { setListingStatus } from "@/lib/actions/listings";
+import { setListingStatus, payForListingBadge } from "@/lib/actions/listings";
 import { CATEGORY_LABELS } from "@/lib/validations/listing";
 import type { ClientListing } from "@/types/listing";
 
@@ -78,6 +79,15 @@ function RowActions({ listing }: { listing: ClientListing }) {
         />
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => updateStatus("SOLD")}>Mark sold</DropdownMenuItem>
+          {!listing.badge && (
+            <BadgeUpgradeMenuItem
+              idField="listingId"
+              idValue={listing.id}
+              defaultPhone={listing.phone ?? ""}
+              payAction={payForListingBadge}
+              statusUrl={`/api/listings/${listing.id}/badge-status`}
+            />
+          )}
           <DropdownMenuItem variant="destructive" onClick={() => updateStatus("REMOVED")}>
             Remove
           </DropdownMenuItem>
@@ -138,7 +148,10 @@ const columns: ColumnDef<ClientListing>[] = [
           <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-muted">
             {listing.images[0] && <Image src={listing.images[0]} alt="" fill className="object-cover" />}
           </div>
-          <span className="line-clamp-1">{listing.title}</span>
+          <span className="line-clamp-1 flex items-center gap-1">
+            {listing.title}
+            {listing.badge && <Star className="size-3.5 shrink-0 fill-blue-500 text-blue-500" />}
+          </span>
         </div>
       );
     },

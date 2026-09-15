@@ -1,30 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "next-auth";
-import { LocationPicker } from "@/components/LocationPicker";
 import { ItemGrid } from "@/components/ItemGrid";
 import { ItemDetailModal } from "@/components/ItemDetailModal";
+import { useGlobalLocation, DEFAULT_RADIUS_KM, MAX_RADIUS_KM } from "@/components/GlobalLocationProvider";
 import { CATEGORY_LABELS, LISTING_CATEGORIES } from "@/lib/validations/listing";
 import type { ClientListing, ListingCategory } from "@/types/listing";
-import type { LatLng } from "@/components/map/LeafletMap";
-
-const DEFAULT_RADIUS_KM = 25;
-const MAX_RADIUS_KM = 500;
 
 export function BrowseSection({
   initialListings,
-  initialTotal,
   session,
 }: {
   initialListings: ClientListing[];
-  initialTotal: number;
   session: Session | null;
 }) {
+  const { location, radiusKm } = useGlobalLocation();
   const [listings, setListings] = useState(initialListings);
-  const [total, setTotal] = useState(initialTotal);
-  const [location, setLocation] = useState<LatLng | null>(null);
-  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ListingCategory | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,7 +39,6 @@ export function BrowseSection({
       if (!res.ok) throw new Error("Failed to load listings");
       const data = await res.json();
       setListings(data.listings);
-      setTotal(data.total);
     } catch {
       // keep showing the previous results rather than clearing the grid
     } finally {
@@ -64,29 +56,6 @@ export function BrowseSection({
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="border-b border-zinc-900 dark:border-zinc-100 px-4 py-3">
-        <LocationPicker
-          location={location}
-          onChange={setLocation}
-          mapSubtitle="or find items near you"
-          allowClear
-        />
-        {location && (
-          <label className="mt-2 flex items-center gap-2 text-sm">
-            Search radius
-            <input
-              type="number"
-              min={1}
-              max={MAX_RADIUS_KM}
-              value={radiusKm}
-              onChange={(e) => setRadiusKm(Number(e.target.value))}
-              className="w-20 rounded-full border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
-            />
-            km
-          </label>
-        )}
-      </div>
-
       <div className="flex flex-col gap-3 px-4 pt-4 sm:flex-row sm:items-center">
         <input
           type="search"
@@ -110,15 +79,17 @@ export function BrowseSection({
         </select>
       </div>
 
-      <p className="px-4 py-3 text-xs text-zinc-500">{total.toLocaleString()} available items</p>
+      <div className="flex flex-col items-start gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-zinc-500">Pick a location above and see items and offers around you.</p>
+        <Link
+          href="/post"
+          className="shrink-0 rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+        >
+          Post an item
+        </Link>
+      </div>
 
-      {location ? (
-        <ItemGrid listings={listings} onSelect={setSelected} loading={loading} />
-      ) : (
-        <p className="px-4 py-10 text-center text-sm text-zinc-500">
-          Set your location above to browse items near you.
-        </p>
-      )}
+      <ItemGrid listings={listings} onSelect={setSelected} loading={loading} />
 
       {selected && <ItemDetailModal listing={selected} session={session} onClose={() => setSelected(null)} />}
     </div>

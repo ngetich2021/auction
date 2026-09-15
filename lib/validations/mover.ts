@@ -19,8 +19,8 @@ export const moverFieldsSchema = z
 
 export type MoverFields = z.infer<typeof moverFieldsSchema>;
 
-export function validateMoverImage(file: File | null): string | null {
-  if (!file || file.size === 0) return "Add a photo of your vehicle";
+export function validateMoverImage(file: File | null, required: boolean = true): string | null {
+  if (!file || file.size === 0) return required ? "Add a photo of your vehicle" : null;
   if (!file.type.startsWith("image/")) return "Only image files are allowed";
   if (file.size > MAX_MOVER_IMAGE_SIZE_MB * 1024 * 1024) {
     return `Photo must be under ${MAX_MOVER_IMAGE_SIZE_MB}MB`;

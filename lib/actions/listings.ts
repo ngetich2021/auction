@@ -1,12 +1,13 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { uploadListingImage } from "@/lib/cloudinary";
 import { initiateStkPush, MpesaError } from "@/lib/mpesa";
 import { listingFieldsSchema, validateListingImages, LISTING_POST_FEE_KES } from "@/lib/validations/listing";
 import { moderateListingSchema } from "@/lib/validations/admin";
+import { BADGE_PRICE_KES } from "@/lib/validations/badge";
 import type { ActionState } from "@/lib/actions/types";
 
 export async function createListing(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -89,6 +90,8 @@ export async function createListing(_prevState: ActionState, formData: FormData)
   }
 
   revalidatePath("/");
+  updateTag("listings");
+  updateTag("admin-listings");
   return {
     ok: true,
     message: `Check your phone to pay the KES ${LISTING_POST_FEE_KES} posting fee.`,
@@ -127,5 +130,55 @@ export async function setListingStatus(_prevState: ActionState, formData: FormDa
   });
 
   revalidatePath("/");
+  updateTag("listings");
+  updateTag("admin-listings");
   return { ok: true, message: "Listing updated." };
+}
+
+export async function payForListingBadge(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const listingId = formData.get("listingId");
+  const phone = formData.get("phone");
+  if (typeof listingId !== "string" || !listingId || typeof phone !== "string" || !phone) {
+    return { ok: false, message: "Invalid request." };
+  }
+
+  const listing = await prisma.listing.findUnique({ where: { id: listingId }, select: { sellerId: true, badge: true } });
+  if (!listing) {
+    return { ok: false, message: "Listing not found." };
+  }
+  const isOwner = listing.sellerId === session.user.id;
+  const isAdmin = session.user.role === "ADMIN";
+  if (!isOwner && !isAdmin) {
+    return { ok: false, message: "You can only manage your own listing." };
+  }
+  if (listing.badge) {
+    return { ok: false, message: "This listing already has the blue star badge." };
+  }
+
+  try {
+    const stk = await initiateStkPush({
+      phone,
+      amount: BADGE_PRICE_KES,
+      accountReference: listingId,
+      transactionDesc: "Listing badge",
+    });
+    await prisma.listing.update({
+      where: { id: listingId },
+      data: { badgeCheckoutRequestId: stk.checkoutRequestId, badgeFailureReason: null },
+    });
+  } catch (error) {
+    const message = error instanceof MpesaError ? error.message : "Could not start M-Pesa payment. Please try again.";
+    return { ok: false, message };
+  }
+
+  return {
+    ok: true,
+    message: `Check your phone to complete the KES ${BADGE_PRICE_KES} payment.`,
+    data: { listingId },
+  };
 }

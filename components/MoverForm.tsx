@@ -4,17 +4,21 @@ import Image from "next/image";
 import type { ChangeEvent, FormEvent } from "react";
 import { useRef, useState } from "react";
 import { useSingleFlightAction } from "@/hooks/useSingleFlightAction";
-import { createMover } from "@/lib/actions/movers";
+import { createMover, updateMover } from "@/lib/actions/movers";
 import { moverFieldsSchema, validateMoverImage } from "@/lib/validations/mover";
 import { LocationPicker } from "@/components/LocationPicker";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { FieldError } from "@/components/ui/FieldError";
 import type { LatLng } from "@/components/map/LeafletMap";
+import type { ClientMover } from "@/types/mover";
 
-export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
-  const [state, formAction, pending] = useSingleFlightAction(createMover);
-  const [location, setLocation] = useState<LatLng | null>(null);
-  const [address, setAddress] = useState("");
+export function MoverForm({ defaultPhone, mover }: { defaultPhone: string; mover?: ClientMover }) {
+  const isEditing = !!mover;
+  const [state, formAction, pending] = useSingleFlightAction(isEditing ? updateMover : createMover);
+  const [location, setLocation] = useState<LatLng | null>(
+    mover ? { latitude: mover.latitude, longitude: mover.longitude } : null
+  );
+  const [address, setAddress] = useState(mover?.address ?? "");
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [clientErrors, setClientErrors] = useState<Record<string, string[]>>({});
@@ -43,7 +47,7 @@ export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
       latitude: location?.latitude,
       longitude: location?.longitude,
     });
-    const imageError = validateMoverImage(image);
+    const imageError = validateMoverImage(image, !isEditing);
 
     if (!fieldsResult.success || imageError) {
       e.preventDefault();
@@ -60,8 +64,9 @@ export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
 
   return (
     <form action={formAction} onSubmit={handleSubmit} className="flex flex-col gap-4 p-4">
-      <h3 className="text-sm font-semibold">List your vehicle</h3>
+      <h3 className="text-sm font-semibold">{isEditing ? "Edit vehicle listing" : "List your vehicle"}</h3>
       <FormAlert ok={state?.ok} message={state?.message} />
+      {isEditing && <input type="hidden" name="moverId" value={mover.id} />}
 
       <label className="flex flex-col gap-1 text-sm">
         Vehicle type
@@ -70,6 +75,7 @@ export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
           required
           minLength={2}
           maxLength={60}
+          defaultValue={mover?.vehicleType}
           placeholder="e.g. Pickup, Canter, Lorry"
           className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2"
         />
@@ -82,6 +88,7 @@ export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
           name="description"
           maxLength={300}
           rows={2}
+          defaultValue={mover?.description ?? ""}
           className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2"
         />
         <FieldError messages={errors.description} />
@@ -94,7 +101,7 @@ export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
           type="tel"
           required
           placeholder="07XXXXXXXX"
-          defaultValue={defaultPhone}
+          defaultValue={mover?.phone ?? defaultPhone}
           className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2"
         />
         <FieldError messages={errors.phone} />
@@ -115,7 +122,7 @@ export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
       </div>
 
       <div className="flex flex-col gap-2 text-sm">
-        Vehicle photo
+        Vehicle photo {isEditing && <span className="text-xs text-zinc-400">(leave blank to keep current photo)</span>}
         <input
           ref={imageInputRef}
           name="image"
@@ -125,17 +132,19 @@ export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
           className="text-sm"
         />
         <FieldError messages={errors.image} />
-        {preview && (
+        {(preview || (isEditing && mover.image)) && (
           <div className="relative h-24 w-24 overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
-            <Image src={preview} alt="" fill className="object-cover" unoptimized />
-            <button
-              type="button"
-              onClick={handleRemoveImage}
-              aria-label="Remove photo"
-              className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-[10px] leading-none text-white hover:bg-black/80"
-            >
-              ✕
-            </button>
+            <Image src={preview ?? mover!.image} alt="" fill className="object-cover" unoptimized={!!preview} />
+            {preview && (
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                aria-label="Remove photo"
+                className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-[10px] leading-none text-white hover:bg-black/80"
+              >
+                ✕
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -145,7 +154,7 @@ export function MoverForm({ defaultPhone }: { defaultPhone: string }) {
         disabled={pending}
         className="self-start rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
       >
-        {pending ? "Posting…" : "List vehicle"}
+        {pending ? "Saving…" : isEditing ? "Save changes" : "List vehicle"}
       </button>
     </form>
   );

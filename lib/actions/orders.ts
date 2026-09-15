@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { initiateStkPush, MpesaError } from "@/lib/mpesa";
@@ -71,6 +71,8 @@ export async function createOrder(_prevState: ActionState, formData: FormData): 
   }
 
   revalidatePath("/");
+  updateTag("orders");
+  updateTag("admin-orders");
   return {
     ok: true,
     message: "Check your phone to complete the M-Pesa payment.",
@@ -99,5 +101,7 @@ export async function cancelOrder(_prevState: ActionState, formData: FormData): 
 
   await prisma.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
   revalidatePath("/");
+  updateTag("orders");
+  updateTag("admin-orders");
   return { ok: true, message: "Order cancelled." };
 }

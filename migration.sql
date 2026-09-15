@@ -215,3 +215,75 @@ CREATE INDEX "users_customRoleId_idx" ON "users"("customRoleId");
 -- AlterTable (YouTube video source removed — only uploaded videos remain)
 ALTER TABLE "advertisements" DROP COLUMN "videoSource";
 
+-- CreateTable
+CREATE TABLE "offers" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "ownerId" TEXT NOT NULL,
+    "shopName" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "discount" TEXT,
+    "phone" TEXT NOT NULL,
+    "image" TEXT NOT NULL,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "latitude" REAL NOT NULL,
+    "longitude" REAL NOT NULL,
+    "address" TEXT,
+    "expiresAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "offers_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX "offers_ownerId_idx" ON "offers"("ownerId");
+
+-- CreateIndex
+CREATE INDEX "offers_active_idx" ON "offers"("active");
+
+-- CreateTable
+CREATE TABLE "eateries" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "ownerId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "foodType" TEXT,
+    "description" TEXT,
+    "phone" TEXT NOT NULL,
+    "image" TEXT NOT NULL,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "latitude" REAL NOT NULL,
+    "longitude" REAL NOT NULL,
+    "address" TEXT,
+    "badge" BOOLEAN NOT NULL DEFAULT false,
+    "badgeCheckoutRequestId" TEXT,
+    "badgeReceipt" TEXT,
+    "badgeFailureReason" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "eateries_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX "eateries_ownerId_idx" ON "eateries"("ownerId");
+
+-- CreateIndex
+CREATE INDEX "eateries_active_idx" ON "eateries"("active");
+
+-- AlterTable (blue-star visibility badge: KES 25 lifts a listing out of the free 500m radius limit)
+ALTER TABLE "movers" ADD COLUMN "badge" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "movers" ADD COLUMN "badgeCheckoutRequestId" TEXT;
+ALTER TABLE "movers" ADD COLUMN "badgeReceipt" TEXT;
+ALTER TABLE "movers" ADD COLUMN "badgeFailureReason" TEXT;
+
+-- AlterTable (blue-star visibility badge: KES 25 lifts a listing out of the free 500m radius limit)
+ALTER TABLE "offers" ADD COLUMN "badge" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "offers" ADD COLUMN "badgeCheckoutRequestId" TEXT;
+ALTER TABLE "offers" ADD COLUMN "badgeReceipt" TEXT;
+ALTER TABLE "offers" ADD COLUMN "badgeFailureReason" TEXT;
+
+-- AlterTable (blue-star visibility badge: KES 25 lifts a listing out of the free 500m radius limit)
+ALTER TABLE "listings" ADD COLUMN "badge" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "listings" ADD COLUMN "badgeCheckoutRequestId" TEXT;
+ALTER TABLE "listings" ADD COLUMN "badgeReceipt" TEXT;
+ALTER TABLE "listings" ADD COLUMN "badgeFailureReason" TEXT;
+

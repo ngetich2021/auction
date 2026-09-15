@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { getListingCount, getListings } from "@/lib/queries";
+import { getListings } from "@/lib/queries";
 import { LISTING_CATEGORIES } from "@/lib/validations/listing";
 import type { ListingCategory } from "@prisma/client";
+
+export const revalidate = 5;
 
 function isListingCategory(value: string | null): value is ListingCategory {
   return !!value && (LISTING_CATEGORIES as readonly string[]).includes(value);
@@ -27,7 +29,7 @@ export async function GET(request: Request) {
     near = { latitude, longitude, radiusKm };
   }
 
-  const [listings, total] = await Promise.all([getListings({ category, search, near }), getListingCount()]);
+  const listings = await getListings({ category, search, near });
 
-  return NextResponse.json({ listings, total });
+  return NextResponse.json({ listings });
 }

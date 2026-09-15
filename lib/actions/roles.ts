@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/actions/admin";
 import { createRoleSchema, togglePermissionSchema, assignUserRoleSchema } from "@/lib/validations/roles";
@@ -33,6 +33,7 @@ export async function createRole(_prevState: ActionState, formData: FormData): P
   });
 
   revalidatePath("/admin");
+  updateTag("admin-roles");
   return { ok: true, message: "Role created." };
 }
 
@@ -52,6 +53,8 @@ export async function deleteRole(_prevState: ActionState, formData: FormData): P
   await prisma.customRole.delete({ where: { id: roleId } });
 
   revalidatePath("/admin");
+  updateTag("admin-roles");
+  updateTag("admin-users");
   return { ok: true, message: "Role deleted." };
 }
 
@@ -83,6 +86,7 @@ export async function togglePermission(_prevState: ActionState, formData: FormDa
   }
 
   revalidatePath("/admin");
+  updateTag("admin-roles");
   return { ok: true, message: "Permissions updated." };
 }
 
@@ -106,5 +110,6 @@ export async function assignUserRole(_prevState: ActionState, formData: FormData
   });
 
   revalidatePath("/admin");
+  updateTag("admin-users");
   return { ok: true, message: "User role assignment updated." };
 }

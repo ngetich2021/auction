@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getMovers } from "@/lib/queries";
 
+export const revalidate = 5;
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const lat = url.searchParams.get("lat");
