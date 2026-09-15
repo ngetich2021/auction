@@ -521,6 +521,16 @@ export const getAllEateriesForAdmin = unstable_cache(
   { revalidate: REVALIDATE_SECONDS, tags: ["admin-eateries"] }
 );
 
+export const getAllContactMessagesForAdmin = unstable_cache(
+  async () =>
+    prisma.contactMessage.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    }),
+  ["admin-contacts"],
+  { revalidate: REVALIDATE_SECONDS, tags: ["admin-contacts"] }
+);
+
 export type AdminPayment = {
   id: string;
   type: "Listing fee" | "Order" | "Advertisement";

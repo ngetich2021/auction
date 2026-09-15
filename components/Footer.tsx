@@ -10,6 +10,9 @@ export function Footer() {
         <Link href="/privacy" className="hover:text-zinc-900 dark:hover:text-zinc-100">
           Privacy Policy
         </Link>
+        <Link href="/contact" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+          Contact &amp; Feedback
+        </Link>
       </div>
       <p className="mt-2">© {new Date().getFullYear()} Disposals. All rights reserved.</p>
     </footer>

@@ -47,6 +47,17 @@ enum AdStatus {
   REJECTED
 }
 
+enum ContactMessageType {
+  CONTACT
+  FEEDBACK
+}
+
+enum ContactMessageStatus {
+  NEW
+  READ
+  RESOLVED
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -67,6 +78,7 @@ model User {
   movers        Mover[]
   offers        Offer[]
   eateries      Eatery[]
+  contactMessages ContactMessage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -320,4 +332,26 @@ model Eatery {
   @@index([ownerId])
   @@index([active])
   @@map("eateries")
+}
+
+model ContactMessage {
+  id      String                @id @default(cuid())
+  type    ContactMessageType    @default(CONTACT)
+  status  ContactMessageStatus  @default(NEW)
+
+  name    String
+  email   String
+  phone   String?
+  subject String?
+  message String
+  rating  Int?
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([status])
+  @@map("contact_messages")
 }

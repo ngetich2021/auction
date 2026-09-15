@@ -11,6 +11,7 @@ import { approveAdvertisement, rejectAdvertisement } from "@/lib/actions/adverti
 import { setMoverActive, deleteMover } from "@/lib/actions/movers";
 import { setOfferActive, deleteOffer } from "@/lib/actions/offers";
 import { setEateryActive, deleteEatery } from "@/lib/actions/eateries";
+import { setContactMessageStatus, deleteContactMessage } from "@/lib/actions/contact";
 import { VIDEO_NOT_PLAYING_REASON } from "@/lib/validations/advertisement";
 import { CATEGORY_LABELS, LISTING_POST_FEE_KES } from "@/lib/validations/listing";
 import { hasPermission, type SessionPermission } from "@/lib/permissions";
@@ -30,6 +31,8 @@ import type { AdminPayment } from "@/lib/queries";
 
 type AdStatus = "PENDING" | "PENDING_APPROVAL" | "ACTIVE" | "EXPIRED" | "CANCELLED" | "REJECTED";
 type PaymentStatus = "PAID" | "AWAITING_PAYMENT" | "FAILED";
+type ContactMessageType = "CONTACT" | "FEEDBACK";
+type ContactMessageStatus = "NEW" | "READ" | "RESOLVED";
 
 export type AdminAccess = { isSuperAdmin: boolean; permissions: SessionPermission[] };
 
@@ -105,6 +108,18 @@ type AdminEatery = {
   badge: boolean;
   owner: { name: string | null; email: string };
 };
+type AdminContact = {
+  id: string;
+  type: ContactMessageType;
+  status: ContactMessageStatus;
+  name: string;
+  email: string;
+  phone: string | null;
+  subject: string | null;
+  message: string;
+  rating: number | null;
+  createdAt: string | Date;
+};
 
 export type AdminData = {
   stats: AdminStats | null;
@@ -117,9 +132,21 @@ export type AdminData = {
   movers: AdminMover[];
   offers: AdminOffer[];
   eateries: AdminEatery[];
+  contacts: AdminContact[];
 };
 
-const TABS = ["overview", "users", "listings", "adverts", "orders", "payments", "movers", "offers", "eateries"] as const;
+const TABS = [
+  "overview",
+  "users",
+  "listings",
+  "adverts",
+  "orders",
+  "payments",
+  "movers",
+  "offers",
+  "eateries",
+  "contacts",
+] as const;
 type Tab = (typeof TABS)[number];
 const RESOURCE_TABS = ["users", "listings", "adverts", "orders", "payments"] as const;
 const TAB_LABELS: Record<Tab, string> = {
@@ -132,6 +159,7 @@ const TAB_LABELS: Record<Tab, string> = {
   movers: "Movers",
   offers: "Offers",
   eateries: "Eateries",
+  contacts: "Contacts",
 };
 
 function sortableHeader(label: string) {
@@ -470,6 +498,53 @@ function EateryActions({ eatery }: { eatery: AdminEatery }) {
   );
 }
 
+function ContactActions({ contact }: { contact: AdminContact }) {
+  const [statusState, statusAction, statusPending] = useSingleFlightAction(setContactMessageStatus);
+  const [deleteState, deleteAction, deletePending] = useSingleFlightAction(deleteContactMessage);
+
+  function setStatus(status: ContactMessageStatus) {
+    const formData = new FormData();
+    formData.set("id", contact.id);
+    formData.set("status", status);
+    statusAction(formData);
+  }
+
+  function handleDelete() {
+    if (!window.confirm(`Delete this message from "${contact.name}"? This cannot be undone.`)) return;
+    const formData = new FormData();
+    formData.set("id", contact.id);
+    deleteAction(formData);
+  }
+
+  const message = statusState?.message ?? deleteState?.message;
+  const ok = statusState?.ok ?? deleteState?.ok;
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <DropdownMenu>
+        <ActionsTrigger disabled={statusPending || deletePending} />
+        <DropdownMenuContent align="end">
+          {["NEW", "READ", "RESOLVED"]
+            .filter((s) => s !== contact.status)
+            .map((s) => (
+              <DropdownMenuItem key={s} onClick={() => setStatus(s as ContactMessageStatus)}>
+                Mark {s.toLowerCase()}
+              </DropdownMenuItem>
+            ))}
+          <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {message && (
+        <span className={`text-xs ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+          {message}
+        </span>
+      )}
+    </div>
+  );
+}
+
 const moverColumns: ColumnDef<AdminMover>[] = [
   {
     accessorKey: "vehicleType",
@@ -585,6 +660,71 @@ const eateryColumns: ColumnDef<AdminEatery>[] = [
     cell: ({ row }) => (
       <div className="flex justify-end">
         <EateryActions eatery={row.original} />
+      </div>
+    ),
+  },
+];
+
+const contactColumns: ColumnDef<AdminContact>[] = [
+  {
+    accessorKey: "type",
+    header: sortableHeader("Type"),
+    cell: ({ row }) => <Badge variant={row.original.type === "FEEDBACK" ? "secondary" : "outline"}>{row.original.type}</Badge>,
+  },
+  {
+    id: "from",
+    accessorFn: (c) => c.name,
+    header: sortableHeader("From"),
+    cell: ({ row }) => (
+      <div className="flex flex-col">
+        <span className="line-clamp-1">{row.original.name}</span>
+        <span className="text-xs text-muted-foreground">{row.original.email}</span>
+        {row.original.phone && <span className="text-xs text-muted-foreground">{row.original.phone}</span>}
+      </div>
+    ),
+  },
+  {
+    id: "content",
+    accessorFn: (c) => c.subject ?? c.message,
+    header: "Message",
+    cell: ({ row }) => (
+      <div className="flex flex-col max-w-xs">
+        {row.original.subject && <span className="text-xs font-medium line-clamp-1">{row.original.subject}</span>}
+        {row.original.rating != null && (
+          <span className="flex items-center gap-0.5">
+            {Array.from({ length: 5 }, (_, i) => (
+              <Star
+                key={i}
+                className={`size-3 ${i < row.original.rating! ? "fill-amber-400 text-amber-400" : "text-zinc-300 dark:text-zinc-700"}`}
+              />
+            ))}
+          </span>
+        )}
+        <span className="line-clamp-2 text-xs text-muted-foreground">{row.original.message}</span>
+      </div>
+    ),
+  },
+  {
+    accessorKey: "status",
+    header: sortableHeader("Status"),
+    cell: ({ row }) => (
+      <Badge variant={row.original.status === "NEW" ? "default" : row.original.status === "RESOLVED" ? "secondary" : "outline"}>
+        {row.original.status}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: "createdAt",
+    header: sortableHeader("Date"),
+    cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.createdAt).toLocaleDateString()}</span>,
+  },
+  {
+    id: "actions",
+    header: () => <span className="sr-only">Actions</span>,
+    enableHiding: false,
+    cell: ({ row }) => (
+      <div className="flex justify-end">
+        <ContactActions contact={row.original} />
       </div>
     ),
   },
@@ -734,8 +874,9 @@ const paymentColumns: ColumnDef<AdminPayment>[] = [
 ];
 
 export function AdminSection({ data, access }: { data: AdminData; access: AdminAccess }) {
-  const { stats, users, listings, orders, adverts, payments, roles, movers, offers, eateries } = data;
+  const { stats, users, listings, orders, adverts, payments, roles, movers, offers, eateries, contacts } = data;
   const { isSuperAdmin, permissions } = access;
+  const newContactCount = contacts.filter((c) => c.status === "NEW").length;
 
   const visibleTabs: Tab[] = isSuperAdmin
     ? [...TABS]
@@ -765,6 +906,11 @@ export function AdminSection({ data, access }: { data: AdminData; access: AdminA
             {t === "adverts" && !!stats?.pendingApprovals && (
               <span className="ml-1.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                 {stats.pendingApprovals}
+              </span>
+            )}
+            {t === "contacts" && !!newContactCount && (
+              <span className="ml-1.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                {newContactCount}
               </span>
             )}
           </button>
@@ -882,6 +1028,17 @@ export function AdminSection({ data, access }: { data: AdminData; access: AdminA
           filterPlaceholder="Filter by eatery…"
           enableRowSelection={false}
           exportFilename="eateries"
+        />
+      )}
+
+      {tab === "contacts" && (
+        <DataTable
+          columns={contactColumns}
+          data={contacts}
+          filterColumnId="from"
+          filterPlaceholder="Filter by name or email…"
+          enableRowSelection={false}
+          exportFilename="contacts"
         />
       )}
 

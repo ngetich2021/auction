@@ -11,6 +11,7 @@ import {
   getAllMoversForAdmin,
   getAllOffersForAdmin,
   getAllEateriesForAdmin,
+  getAllContactMessagesForAdmin,
 } from "@/lib/queries";
 import { hasPermission } from "@/lib/permissions";
 import { AdminSection } from "@/components/AdminSection";
@@ -27,22 +28,24 @@ export async function AdminContent() {
   const canRead = (resource: "users" | "listings" | "adverts" | "orders" | "payments") =>
     isSuperAdmin || hasPermission(permissions, resource, "READ");
 
-  const [stats, users, listings, orders, adverts, payments, roles, movers, offers, eateries] = await Promise.all([
-    isSuperAdmin ? getAdminStats() : null,
-    canRead("users") ? getAllUsersForAdmin() : [],
-    canRead("listings") ? getAllListingsForAdmin() : [],
-    canRead("orders") ? getAllOrdersForAdmin() : [],
-    canRead("adverts") ? getAllAdvertisementsForAdmin() : [],
-    canRead("payments") ? getAllPaymentsForAdmin() : [],
-    isSuperAdmin ? getAllRolesForAdmin() : [],
-    isSuperAdmin ? getAllMoversForAdmin() : [],
-    isSuperAdmin ? getAllOffersForAdmin() : [],
-    isSuperAdmin ? getAllEateriesForAdmin() : [],
-  ]);
+  const [stats, users, listings, orders, adverts, payments, roles, movers, offers, eateries, contacts] =
+    await Promise.all([
+      isSuperAdmin ? getAdminStats() : null,
+      canRead("users") ? getAllUsersForAdmin() : [],
+      canRead("listings") ? getAllListingsForAdmin() : [],
+      canRead("orders") ? getAllOrdersForAdmin() : [],
+      canRead("adverts") ? getAllAdvertisementsForAdmin() : [],
+      canRead("payments") ? getAllPaymentsForAdmin() : [],
+      isSuperAdmin ? getAllRolesForAdmin() : [],
+      isSuperAdmin ? getAllMoversForAdmin() : [],
+      isSuperAdmin ? getAllOffersForAdmin() : [],
+      isSuperAdmin ? getAllEateriesForAdmin() : [],
+      isSuperAdmin ? getAllContactMessagesForAdmin() : [],
+    ]);
 
   return (
     <AdminSection
-      data={{ stats, users, listings, orders, adverts, payments, roles, movers, offers, eateries }}
+      data={{ stats, users, listings, orders, adverts, payments, roles, movers, offers, eateries, contacts }}
       access={{ isSuperAdmin, permissions }}
     />
   );

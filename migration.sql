@@ -287,3 +287,25 @@ ALTER TABLE "listings" ADD COLUMN "badgeCheckoutRequestId" TEXT;
 ALTER TABLE "listings" ADD COLUMN "badgeReceipt" TEXT;
 ALTER TABLE "listings" ADD COLUMN "badgeFailureReason" TEXT;
 
+-- CreateTable
+CREATE TABLE "contact_messages" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "type" TEXT NOT NULL DEFAULT 'CONTACT',
+    "status" TEXT NOT NULL DEFAULT 'NEW',
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "phone" TEXT,
+    "subject" TEXT,
+    "message" TEXT NOT NULL,
+    "rating" INTEGER,
+    "userId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "contact_messages_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX "contact_messages_type_idx" ON "contact_messages"("type");
+
+-- CreateIndex
+CREATE INDEX "contact_messages_status_idx" ON "contact_messages"("status");
+
