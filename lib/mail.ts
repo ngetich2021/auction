@@ -12,7 +12,7 @@ const transporter = nodemailer.createTransport({
 export async function sendMail(params: { to: string; subject: string; html: string }) {
   try {
     await transporter.sendMail({
-      from: `Disposals <${process.env.GMAIL_USER}>`,
+      from: `Auctions <${process.env.GMAIL_USER}>`,
       to: params.to,
       subject: params.subject,
       html: params.html,

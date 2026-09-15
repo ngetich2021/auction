@@ -13,7 +13,8 @@ import { setOfferActive, deleteOffer } from "@/lib/actions/offers";
 import { setEateryActive, deleteEatery } from "@/lib/actions/eateries";
 import { setContactMessageStatus, deleteContactMessage } from "@/lib/actions/contact";
 import { VIDEO_NOT_PLAYING_REASON } from "@/lib/validations/advertisement";
-import { CATEGORY_LABELS, LISTING_POST_FEE_KES } from "@/lib/validations/listing";
+import { CATEGORY_LABELS } from "@/lib/validations/listing";
+import { BADGE_PRICE_KES } from "@/lib/validations/badge";
 import { hasPermission, type SessionPermission } from "@/lib/permissions";
 import { RolesModal, PermissionsModal, type AdminRole } from "@/components/AdminRolesPermissions";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +31,7 @@ import type { ListingCategory, ListingStatus } from "@/types/listing";
 import type { AdminPayment } from "@/lib/queries";
 
 type AdStatus = "PENDING" | "PENDING_APPROVAL" | "ACTIVE" | "EXPIRED" | "CANCELLED" | "REJECTED";
-type PaymentStatus = "PAID" | "AWAITING_PAYMENT" | "FAILED";
+type PaymentStatus = "PAID" | "AWAITING_PAYMENT" | "FAILED" | "FREE";
 type ContactMessageType = "CONTACT" | "FEEDBACK";
 type ContactMessageStatus = "NEW" | "READ" | "RESOLVED";
 
@@ -40,7 +41,7 @@ type AdminStats = {
   userCount: number;
   listingCount: number;
   orderCount: number;
-  totalRevenue: number;
+  orderTotalValue: number;
   activeAds: number;
   pendingApprovals: number;
   listingFeeRevenue: number;
@@ -794,7 +795,17 @@ function buildListingColumns(canManage: boolean): ColumnDef<AdminListing>[] {
     accessorKey: "paymentStatus",
     header: "Payment",
     cell: ({ row }) => (
-      <Badge variant={row.original.paymentStatus === "PAID" ? "default" : row.original.paymentStatus === "FAILED" ? "destructive" : "secondary"}>
+      <Badge
+        variant={
+          row.original.paymentStatus === "PAID"
+            ? "default"
+            : row.original.paymentStatus === "FAILED"
+              ? "destructive"
+              : row.original.paymentStatus === "FREE"
+                ? "outline"
+                : "secondary"
+        }
+      >
         {row.original.paymentStatus}
       </Badge>
     ),
@@ -922,12 +933,12 @@ export function AdminSection({ data, access }: { data: AdminData; access: AdminA
           <StatCard label="Users" value={stats.userCount} />
           <StatCard label="Listings" value={stats.listingCount} />
           <StatCard label="Orders" value={stats.orderCount} />
-          <StatCard label="Order revenue" value={`KES ${stats.totalRevenue.toLocaleString()}`} />
+          <StatCard label="Order value (buyer↔seller)" value={`KES ${stats.orderTotalValue.toLocaleString()}`} />
           <StatCard label="Active ads" value={stats.activeAds} />
           <StatCard label="Pending ad approvals" value={stats.pendingApprovals} />
-          <StatCard label="Listing fee revenue" value={`KES ${stats.listingFeeRevenue.toLocaleString()}`} />
+          <StatCard label="Listing fees (historical)" value={`KES ${stats.listingFeeRevenue.toLocaleString()}`} />
           <StatCard label="Ad revenue" value={`KES ${stats.adRevenue.toLocaleString()}`} />
-          <StatCard label="Listing post fee" value={`KES ${LISTING_POST_FEE_KES}`} />
+          <StatCard label="Badge price" value={`KES ${BADGE_PRICE_KES}`} />
         </div>
       )}
 

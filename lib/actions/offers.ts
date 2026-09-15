@@ -7,6 +7,7 @@ import { uploadOfferImage } from "@/lib/cloudinary";
 import { initiateStkPush, MpesaError } from "@/lib/mpesa";
 import { offerFieldsSchema, validateOfferImage } from "@/lib/validations/offer";
 import { BADGE_PRICE_KES } from "@/lib/validations/badge";
+import { STALE_AFTER_DAYS } from "@/lib/validations/staleness";
 import type { ActionState } from "@/lib/actions/types";
 
 export async function createOffer(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -201,6 +202,33 @@ export async function setOfferActive(_prevState: ActionState, formData: FormData
   revalidatePath("/");
   updateTag("offers");
   return { ok: true, message: active ? "Offer is now visible to shoppers." : "Offer hidden." };
+}
+
+export async function reactivateOffer(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const offerId = formData.get("offerId");
+  if (typeof offerId !== "string" || !offerId) {
+    return { ok: false, message: "Invalid request." };
+  }
+
+  const offer = await prisma.offer.findUnique({ where: { id: offerId }, select: { ownerId: true } });
+  if (!offer) {
+    return { ok: false, message: "Offer not found." };
+  }
+  const isOwner = offer.ownerId === session.user.id;
+  const isAdmin = session.user.role === "ADMIN";
+  if (!isOwner && !isAdmin) {
+    return { ok: false, message: "You can only manage your own offers." };
+  }
+
+  await prisma.offer.update({ where: { id: offerId }, data: { activatedAt: new Date() } });
+  revalidatePath("/");
+  updateTag("offers");
+  return { ok: true, message: `Reactivated — visible for ${STALE_AFTER_DAYS} more days.` };
 }
 
 export async function payForOfferBadge(_prevState: ActionState, formData: FormData): Promise<ActionState> {

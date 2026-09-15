@@ -12,5 +12,6 @@ export type ClientEatery = {
   address: string | null;
   distanceKm: number | null;
   createdAt: string | Date;
+  activatedAt: string | Date;
   owner: { id: string; name: string | null; image: string | null };
 };

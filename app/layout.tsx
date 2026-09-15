@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Disposals — Auctions& Movers",
+  title: "Auctions — Movers & More",
   description: "Auction items and mover listings near you.",
   icons: {
     icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Loader2, MoreHorizontal, Star } from "lucide-react";
@@ -7,6 +8,7 @@ import { ArrowUpDown, Loader2, MoreHorizontal, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Modal } from "@/components/ui/Modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,9 +17,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/ui/data-table";
 import { BadgeUpgradeMenuItem } from "@/components/ui/BadgeUpgrade";
+import { ListingForm } from "@/components/ListingForm";
 import { useSingleFlightAction } from "@/hooks/useSingleFlightAction";
-import { setListingStatus, payForListingBadge } from "@/lib/actions/listings";
+import { setListingStatus, payForListingBadge, reactivateListing, deleteListing } from "@/lib/actions/listings";
 import { CATEGORY_LABELS } from "@/lib/validations/listing";
+import { getFreshness } from "@/lib/staleness";
 import type { ClientListing } from "@/types/listing";
 
 const STATUS_LABELS: Record<ClientListing["status"], string> = {
@@ -38,6 +42,7 @@ const STATUS_BADGE_VARIANT: Record<
 };
 
 const PAYMENT_LABELS: Record<NonNullable<ClientListing["paymentStatus"]>, string> = {
+  FREE: "Free",
   PAID: "Paid",
   AWAITING_PAYMENT: "Awaiting payment",
   FAILED: "Payment failed",
@@ -47,6 +52,7 @@ const PAYMENT_BADGE_VARIANT: Record<
   NonNullable<ClientListing["paymentStatus"]>,
   "default" | "secondary" | "outline" | "destructive"
 > = {
+  FREE: "outline",
   PAID: "default",
   AWAITING_PAYMENT: "secondary",
   FAILED: "destructive",
@@ -54,6 +60,10 @@ const PAYMENT_BADGE_VARIANT: Record<
 
 function RowActions({ listing }: { listing: ClientListing }) {
   const [state, formAction, pending] = useSingleFlightAction(setListingStatus);
+  const [reactivateState, reactivateAction, reactivatePending] = useSingleFlightAction(reactivateListing);
+  const [deleteState, deleteAction, deletePending] = useSingleFlightAction(deleteListing);
+  const [editing, setEditing] = useState(false);
+  const isAvailable = listing.status === "AVAILABLE";
 
   function updateStatus(status: "SOLD" | "REMOVED") {
     const formData = new FormData();
@@ -62,24 +72,39 @@ function RowActions({ listing }: { listing: ClientListing }) {
     formAction(formData);
   }
 
-  if (listing.status !== "AVAILABLE") {
-    return <span className="text-xs text-muted-foreground">—</span>;
+  function reactivate() {
+    const formData = new FormData();
+    formData.set("listingId", listing.id);
+    reactivateAction(formData);
   }
+
+  function handleDelete() {
+    if (!window.confirm(`Delete "${listing.title}"? This cannot be undone.`)) return;
+    const formData = new FormData();
+    formData.set("listingId", listing.id);
+    deleteAction(formData);
+  }
+
+  const message = state?.message ?? reactivateState?.message ?? deleteState?.message;
+  const ok = state?.ok ?? reactivateState?.ok ?? deleteState?.ok;
+  const anyPending = pending || reactivatePending || deletePending;
 
   return (
     <div className="flex flex-col items-end gap-1">
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <Button variant="ghost" size="icon" disabled={pending}>
-              {pending ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}
+            <Button variant="ghost" size="icon" disabled={anyPending}>
+              {anyPending ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}
               <span className="sr-only">Open menu</span>
             </Button>
           }
         />
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => updateStatus("SOLD")}>Mark sold</DropdownMenuItem>
-          {!listing.badge && (
+          <DropdownMenuItem onClick={() => setEditing(true)}>Edit</DropdownMenuItem>
+          {isAvailable && <DropdownMenuItem onClick={() => updateStatus("SOLD")}>Mark sold</DropdownMenuItem>}
+          {isAvailable && <DropdownMenuItem onClick={reactivate}>Reactivate</DropdownMenuItem>}
+          {isAvailable && !listing.badge && (
             <BadgeUpgradeMenuItem
               idField="listingId"
               idValue={listing.id}
@@ -88,19 +113,29 @@ function RowActions({ listing }: { listing: ClientListing }) {
               statusUrl={`/api/listings/${listing.id}/badge-status`}
             />
           )}
-          <DropdownMenuItem variant="destructive" onClick={() => updateStatus("REMOVED")}>
-            Remove
+          {isAvailable && (
+            <DropdownMenuItem variant="destructive" onClick={() => updateStatus("REMOVED")}>
+              Remove
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+            Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {pending && <span className="text-xs text-muted-foreground">Updating…</span>}
-      {state?.message && (
+      {anyPending && <span className="text-xs text-muted-foreground">Updating…</span>}
+      {message && (
         <p
-          role={state.ok ? "status" : "alert"}
-          className={`text-xs ${state.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+          role={ok ? "status" : "alert"}
+          className={`text-xs ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
         >
-          {state.message}
+          {message}
         </p>
+      )}
+      {editing && (
+        <Modal onClose={() => setEditing(false)}>
+          <ListingForm phone={listing.phone ?? ""} listing={listing} onSuccess={() => setEditing(false)} />
+        </Modal>
       )}
     </div>
   );
@@ -171,9 +206,20 @@ const columns: ColumnDef<ClientListing>[] = [
   {
     accessorKey: "status",
     header: sortableHeader("Status"),
-    cell: ({ row }) => (
-      <Badge variant={STATUS_BADGE_VARIANT[row.original.status]}>{STATUS_LABELS[row.original.status]}</Badge>
-    ),
+    cell: ({ row }) => {
+      const listing = row.original;
+      const { stale, daysLeft } = getFreshness(listing.activatedAt);
+      return (
+        <div className="flex flex-col gap-0.5">
+          <Badge variant={STATUS_BADGE_VARIANT[listing.status]}>{STATUS_LABELS[listing.status]}</Badge>
+          {listing.status === "AVAILABLE" && (
+            <span className={`text-xs ${stale ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+              {stale ? "Stale — reactivate to show" : `Reactivate within ${daysLeft}d`}
+            </span>
+          )}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "paymentStatus",

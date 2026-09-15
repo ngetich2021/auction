@@ -14,5 +14,6 @@ export type ClientOffer = {
   expiresAt: string | Date | null;
   distanceKm: number | null;
   createdAt: string | Date;
+  activatedAt: string | Date;
   owner: { id: string; name: string | null; image: string | null };
 };

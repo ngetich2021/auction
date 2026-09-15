@@ -309,3 +309,23 @@ CREATE INDEX "contact_messages_type_idx" ON "contact_messages"("type");
 -- CreateIndex
 CREATE INDEX "contact_messages_status_idx" ON "contact_messages"("status");
 
+-- AlterTable (5-day staleness: an item not reactivated within 5 days of its last activation is
+-- hidden from public browsing until the owner reactivates it. SQLite's ALTER TABLE ADD COLUMN
+-- rejects a non-constant default like CURRENT_TIMESTAMP, so the column is added nullable and
+-- backfilled via UPDATE instead — Prisma/the app always supplies a value going forward.)
+ALTER TABLE "listings" ADD COLUMN "activatedAt" DATETIME;
+ALTER TABLE "movers" ADD COLUMN "activatedAt" DATETIME;
+ALTER TABLE "offers" ADD COLUMN "activatedAt" DATETIME;
+ALTER TABLE "eateries" ADD COLUMN "activatedAt" DATETIME;
+
+UPDATE "listings" SET "activatedAt" = CURRENT_TIMESTAMP WHERE "activatedAt" IS NULL;
+UPDATE "movers" SET "activatedAt" = CURRENT_TIMESTAMP WHERE "activatedAt" IS NULL;
+UPDATE "offers" SET "activatedAt" = CURRENT_TIMESTAMP WHERE "activatedAt" IS NULL;
+UPDATE "eateries" SET "activatedAt" = CURRENT_TIMESTAMP WHERE "activatedAt" IS NULL;
+
+-- CreateIndex
+CREATE INDEX "listings_activatedAt_idx" ON "listings"("activatedAt");
+CREATE INDEX "movers_activatedAt_idx" ON "movers"("activatedAt");
+CREATE INDEX "offers_activatedAt_idx" ON "offers"("activatedAt");
+CREATE INDEX "eateries_activatedAt_idx" ON "eateries"("activatedAt");
+

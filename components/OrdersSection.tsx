@@ -92,7 +92,7 @@ const purchaseColumns: ColumnDef<BuyerOrder>[] = [
     header: () => <span className="sr-only">Actions</span>,
     enableHiding: false,
     cell: ({ row }) =>
-      row.original.status === "PENDING" || row.original.status === "FAILED" ? (
+      row.original.status === "COMPLETED" ? (
         <CancelButton orderId={row.original.id} />
       ) : (
         <span className="text-xs text-muted-foreground">—</span>

@@ -27,8 +27,9 @@ export type ClientListing = {
   sellerId: string;
   createdAt: string | Date;
   updatedAt: string | Date;
+  activatedAt: string | Date;
   isBoosted: boolean;
   distanceKm: number | null;
   seller: { id: string; name: string | null; image: string | null };
-  paymentStatus?: "PAID" | "AWAITING_PAYMENT" | "FAILED";
+  paymentStatus?: "PAID" | "AWAITING_PAYMENT" | "FAILED" | "FREE";
 };

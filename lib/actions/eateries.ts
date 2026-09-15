@@ -7,6 +7,7 @@ import { uploadEateryImage } from "@/lib/cloudinary";
 import { initiateStkPush, MpesaError } from "@/lib/mpesa";
 import { eateryFieldsSchema, validateEateryImage } from "@/lib/validations/eatery";
 import { BADGE_PRICE_KES } from "@/lib/validations/badge";
+import { STALE_AFTER_DAYS } from "@/lib/validations/staleness";
 import type { ActionState } from "@/lib/actions/types";
 
 export async function createEatery(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -193,6 +194,33 @@ export async function setEateryActive(_prevState: ActionState, formData: FormDat
   revalidatePath("/");
   updateTag("eateries");
   return { ok: true, message: active ? "Eatery is now visible to shoppers." : "Eatery hidden." };
+}
+
+export async function reactivateEatery(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const eateryId = formData.get("eateryId");
+  if (typeof eateryId !== "string" || !eateryId) {
+    return { ok: false, message: "Invalid request." };
+  }
+
+  const eatery = await prisma.eatery.findUnique({ where: { id: eateryId }, select: { ownerId: true } });
+  if (!eatery) {
+    return { ok: false, message: "Eatery not found." };
+  }
+  const isOwner = eatery.ownerId === session.user.id;
+  const isAdmin = session.user.role === "ADMIN";
+  if (!isOwner && !isAdmin) {
+    return { ok: false, message: "You can only manage your own eatery." };
+  }
+
+  await prisma.eatery.update({ where: { id: eateryId }, data: { activatedAt: new Date() } });
+  revalidatePath("/");
+  updateTag("eateries");
+  return { ok: true, message: `Reactivated — visible for ${STALE_AFTER_DAYS} more days.` };
 }
 
 export async function payForEateryBadge(_prevState: ActionState, formData: FormData): Promise<ActionState> {

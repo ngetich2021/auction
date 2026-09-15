@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { LISTING_POST_FEE_KES } from "@/lib/validations/listing";
 import { FREE_VISIBILITY_RADIUS_KM } from "@/lib/validations/badge";
+import { STALE_AFTER_DAYS } from "@/lib/validations/staleness";
 import { haversineKm } from "@/lib/geo";
 import type { ListingCategory, Prisma } from "@prisma/client";
 
@@ -13,6 +14,15 @@ function boundingBox(lat: number, lng: number, radiusKm: number) {
     latitude: { gte: lat - latDelta, lte: lat + latDelta },
     longitude: { gte: lng - lngDelta, lte: lng + lngDelta },
   };
+}
+
+// An item not reactivated within STALE_AFTER_DAYS of its last activation is hidden from public
+// browsing (Listing/Mover/Offer/Eatery alike) until the owner reactivates it — see
+// `reactivate*` in each lib/actions/*.ts. Owner- and admin-facing queries ignore this and show
+// everything regardless of freshness.
+function notStale() {
+  const cutoff = new Date(Date.now() - STALE_AFTER_DAYS * 24 * 60 * 60 * 1000);
+  return { activatedAt: { gte: cutoff } };
 }
 
 // Free (unbadged) listings are only discoverable within FREE_VISIBILITY_RADIUS_KM of the
@@ -64,6 +74,7 @@ export const getListings = unstable_cache(
 
     const where: Prisma.ListingWhereInput = {
       status: "AVAILABLE",
+      ...notStale(),
       ...(filter.category ? { category: filter.category } : {}),
       ...(filter.search
         ? {
@@ -126,7 +137,22 @@ export const getListingById = unstable_cache(
   { revalidate: REVALIDATE_SECONDS, tags: ["listings"] }
 );
 
-export type ListingPaymentStatus = "PAID" | "AWAITING_PAYMENT" | "FAILED";
+export type ListingPaymentStatus = "PAID" | "AWAITING_PAYMENT" | "FAILED" | "FREE";
+
+// Posting a listing is free (like offers/movers/eateries) — the mpesaReceipt/failureReason/
+// mpesaCheckoutRequestId fields only get set for the small set of listings created before that
+// change, or for one still mid-flight. A listing that never attempted a posting-fee payment is
+// just "FREE", not "AWAITING_PAYMENT".
+function getListingPaymentStatus(listing: {
+  mpesaReceipt: string | null;
+  failureReason: string | null;
+  mpesaCheckoutRequestId: string | null;
+}): ListingPaymentStatus {
+  if (listing.mpesaReceipt) return "PAID";
+  if (listing.failureReason) return "FAILED";
+  if (listing.mpesaCheckoutRequestId) return "AWAITING_PAYMENT";
+  return "FREE";
+}
 
 export const getMyListings = unstable_cache(
   async (sellerId: string) => {
@@ -136,11 +162,7 @@ export const getMyListings = unstable_cache(
       orderBy: { createdAt: "desc" },
     });
     return listings.map((listing) => {
-      const paymentStatus: ListingPaymentStatus = listing.mpesaReceipt
-        ? "PAID"
-        : listing.failureReason
-          ? "FAILED"
-          : "AWAITING_PAYMENT";
+      const paymentStatus = getListingPaymentStatus(listing);
       return {
         ...omitPaymentFields(listing),
         images: parseListingImages(listing.images),
@@ -236,6 +258,7 @@ export const getMovers = unstable_cache(
     const movers = await prisma.mover.findMany({
       where: {
         active: true,
+        ...notStale(),
         // With no location picked there's no "near" to measure the free 500m radius against, so
         // only badged (paid, sitewide-visible) listings are discoverable.
         ...(near ? boundingBox(near.latitude, near.longitude, near.radiusKm) : { badge: true }),
@@ -286,6 +309,7 @@ export const getOffers = unstable_cache(
     const offers = await prisma.offer.findMany({
       where: {
         active: true,
+        ...notStale(),
         OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         // With no location picked there's no "near" to measure the free 500m radius against, so
         // only badged (paid, sitewide-visible) listings are discoverable.
@@ -337,6 +361,7 @@ export const getEateries = unstable_cache(
     const eateries = await prisma.eatery.findMany({
       where: {
         active: true,
+        ...notStale(),
         // With no location picked there's no "near" to measure the free 500m radius against, so
         // only badged (paid, sitewide-visible) listings are discoverable.
         ...(near ? boundingBox(near.latitude, near.longitude, near.radiusKm) : { badge: true }),
@@ -378,12 +403,14 @@ export const getMyEateries = unstable_cache(
 
 export const getAdminStats = unstable_cache(
   async () => {
-    const [userCount, listingCount, orderCount, paidOrders, activeAds, pendingApprovals, listingFees] =
+    const [userCount, listingCount, orderCount, completedOrders, activeAds, pendingApprovals, listingFees] =
       await Promise.all([
         prisma.user.count(),
         prisma.listing.count(),
         prisma.order.count(),
-        prisma.order.aggregate({ where: { status: "PAID" }, _sum: { totalAmount: true } }),
+        // Orders are buyer/seller connections, not platform-collected payments (see Terms §5) —
+        // this is the total value of goods exchanged, not platform revenue.
+        prisma.order.aggregate({ where: { status: "COMPLETED" }, _sum: { totalAmount: true } }),
         prisma.advertisement.count({ where: { status: "ACTIVE" } }),
         prisma.advertisement.count({ where: { status: "PENDING_APPROVAL" } }),
         prisma.listing.count({ where: { mpesaReceipt: { not: null } } }),
@@ -396,7 +423,7 @@ export const getAdminStats = unstable_cache(
       userCount,
       listingCount,
       orderCount,
-      totalRevenue: paidOrders._sum.totalAmount ?? 0,
+      orderTotalValue: completedOrders._sum.totalAmount ?? 0,
       activeAds,
       pendingApprovals,
       listingFeeRevenue: listingFees * LISTING_POST_FEE_KES,
@@ -433,11 +460,7 @@ export const getAllListingsForAdmin = unstable_cache(
       orderBy: { createdAt: "desc" },
     });
     return listings.map((listing) => {
-      const paymentStatus: ListingPaymentStatus = listing.mpesaReceipt
-        ? "PAID"
-        : listing.failureReason
-          ? "FAILED"
-          : "AWAITING_PAYMENT";
+      const paymentStatus = getListingPaymentStatus(listing);
       return { ...listing, images: parseListingImages(listing.images), paymentStatus };
     });
   },

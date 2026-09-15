@@ -7,46 +7,6 @@ import { AD_PRICE_PER_DAY_KES } from "@/lib/validations/advertisement";
 // reconciliation path (lib/mpesa.ts queryStkPushStatus) — both resolve to the same
 // succeeded/resultDesc/receiptNumber shape and must apply identical side effects.
 
-export async function handleOrderCallback(
-  order: { id: string; listingId: string; buyerId: string; quantity: number },
-  succeeded: boolean,
-  resultDesc: string | undefined,
-  receiptNumber: string | undefined
-) {
-  if (!succeeded) {
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { status: "FAILED", failureReason: resultDesc ?? "Payment was not completed." },
-    });
-    return;
-  }
-
-  await prisma.order.update({
-    where: { id: order.id },
-    data: { status: "PAID", mpesaReceipt: receiptNumber ?? null },
-  });
-
-  const listing = await prisma.listing.findUnique({ where: { id: order.listingId } });
-  if (listing) {
-    const remaining = Math.max(listing.quantity - order.quantity, 0);
-    await prisma.listing.update({
-      where: { id: listing.id },
-      data: { quantity: remaining, status: remaining <= 0 ? "SOLD" : listing.status },
-    });
-  }
-
-  const buyer = await prisma.user.findUnique({ where: { id: order.buyerId } });
-  if (buyer?.email) {
-    await sendMail({
-      to: buyer.email,
-      subject: "Your order is confirmed",
-      html: `<p>Your payment for "${listing?.title ?? "your order"}" was received.</p><p>M-Pesa receipt: ${
-        receiptNumber ?? "N/A"
-      }</p>`,
-    });
-  }
-}
-
 export async function handleAdvertisementCallback(
   ad: { id: string; ownerId: string; listingId: string; pendingExtensionDays: number | null; endsAt: Date | null; amount: number },
   succeeded: boolean,
@@ -119,39 +79,6 @@ export async function handleAdvertisementCallback(
       })
     )
   );
-}
-
-export async function handleListingCallback(
-  listing: { id: string; sellerId: string; title: string },
-  succeeded: boolean,
-  resultDesc: string | undefined,
-  receiptNumber: string | undefined
-) {
-  if (!succeeded) {
-    // ListingStatus has no dedicated "payment failed" state — it stays PENDING (the seller can
-    // see failureReason and retry) rather than silently disappearing into REMOVED.
-    await prisma.listing.update({
-      where: { id: listing.id },
-      data: { failureReason: resultDesc ?? "Payment was not completed." },
-    });
-    return;
-  }
-
-  await prisma.listing.update({
-    where: { id: listing.id },
-    data: { status: "AVAILABLE", mpesaReceipt: receiptNumber ?? null, failureReason: null },
-  });
-
-  const seller = await prisma.user.findUnique({ where: { id: listing.sellerId } });
-  if (seller?.email) {
-    await sendMail({
-      to: seller.email,
-      subject: "Your listing is live",
-      html: `<p>Your posting fee for "${listing.title}" was received and your listing is now live.</p><p>M-Pesa receipt: ${
-        receiptNumber ?? "N/A"
-      }</p>`,
-    });
-  }
 }
 
 // Shared shape for the near-identical blue-star badge callbacks below (Listing/Mover/Offer/Eatery).

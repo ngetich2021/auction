@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
-  handleOrderCallback,
   handleAdvertisementCallback,
-  handleListingCallback,
   handleListingBadgeCallback,
   handleMoverBadgeCallback,
   handleOfferBadgeCallback,
@@ -40,21 +38,9 @@ export async function POST(request: Request) {
   const receiptNumber = typeof receipt === "string" ? receipt : undefined;
 
   try {
-    const order = await prisma.order.findFirst({ where: { mpesaCheckoutRequestId: checkoutRequestId } });
-    if (order) {
-      await handleOrderCallback(order, succeeded, callback.ResultDesc, receiptNumber);
-      return NextResponse.json(ACK);
-    }
-
     const ad = await prisma.advertisement.findFirst({ where: { mpesaCheckoutRequestId: checkoutRequestId } });
     if (ad) {
       await handleAdvertisementCallback(ad, succeeded, callback.ResultDesc, receiptNumber);
-      return NextResponse.json(ACK);
-    }
-
-    const listing = await prisma.listing.findFirst({ where: { mpesaCheckoutRequestId: checkoutRequestId } });
-    if (listing) {
-      await handleListingCallback(listing, succeeded, callback.ResultDesc, receiptNumber);
       return NextResponse.json(ACK);
     }
 

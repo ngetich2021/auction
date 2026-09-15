@@ -7,6 +7,7 @@ import { uploadMoverImage } from "@/lib/cloudinary";
 import { initiateStkPush, MpesaError } from "@/lib/mpesa";
 import { moverFieldsSchema, validateMoverImage } from "@/lib/validations/mover";
 import { BADGE_PRICE_KES } from "@/lib/validations/badge";
+import { STALE_AFTER_DAYS } from "@/lib/validations/staleness";
 import type { ActionState } from "@/lib/actions/types";
 
 export async function createMover(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -189,6 +190,33 @@ export async function setMoverActive(_prevState: ActionState, formData: FormData
   revalidatePath("/");
   updateTag("movers");
   return { ok: true, message: active ? "Listing is now visible to clients." : "Listing hidden." };
+}
+
+export async function reactivateMover(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, message: "Sign in required." };
+  }
+
+  const moverId = formData.get("moverId");
+  if (typeof moverId !== "string" || !moverId) {
+    return { ok: false, message: "Invalid request." };
+  }
+
+  const mover = await prisma.mover.findUnique({ where: { id: moverId }, select: { ownerId: true } });
+  if (!mover) {
+    return { ok: false, message: "Listing not found." };
+  }
+  const isOwner = mover.ownerId === session.user.id;
+  const isAdmin = session.user.role === "ADMIN";
+  if (!isOwner && !isAdmin) {
+    return { ok: false, message: "You can only manage your own listing." };
+  }
+
+  await prisma.mover.update({ where: { id: moverId }, data: { activatedAt: new Date() } });
+  revalidatePath("/");
+  updateTag("movers");
+  return { ok: true, message: `Reactivated — visible for ${STALE_AFTER_DAYS} more days.` };
 }
 
 export async function payForMoverBadge(_prevState: ActionState, formData: FormData): Promise<ActionState> {

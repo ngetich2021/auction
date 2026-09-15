@@ -14,7 +14,7 @@ export function Footer() {
           Contact &amp; Feedback
         </Link>
       </div>
-      <p className="mt-2">© {new Date().getFullYear()} Disposals. All rights reserved.</p>
+      <p className="mt-2">© {new Date().getFullYear()} Auctions. All rights reserved.</p>
     </footer>
   );
 }

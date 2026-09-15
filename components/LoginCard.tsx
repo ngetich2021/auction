@@ -20,7 +20,7 @@ export function LoginCard() {
 
   return (
     <div className="w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 shadow-sm">
-      <h1 className="text-xl font-semibold text-center">Sign in to Disposals</h1>
+      <h1 className="text-xl font-semibold text-center">Sign in to Auctions</h1>
       <p className="mt-2 text-sm text-zinc-500 text-center">
         Auction items, land, and movers near you.
       </p>

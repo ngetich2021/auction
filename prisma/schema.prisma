@@ -179,6 +179,8 @@ model Listing {
   badgeReceipt           String?
   badgeFailureReason     String?
 
+  activatedAt DateTime @default(now())
+
   seller   User   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   sellerId String
 
@@ -191,6 +193,7 @@ model Listing {
   @@index([category])
   @@index([status])
   @@index([sellerId])
+  @@index([activatedAt])
   @@map("listings")
 }
 
@@ -267,11 +270,14 @@ model Mover {
   badgeReceipt           String?
   badgeFailureReason     String?
 
+  activatedAt DateTime @default(now())
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ownerId])
   @@index([active])
+  @@index([activatedAt])
   @@map("movers")
 }
 
@@ -298,11 +304,14 @@ model Offer {
   badgeReceipt           String?
   badgeFailureReason     String?
 
+  activatedAt DateTime @default(now())
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ownerId])
   @@index([active])
+  @@index([activatedAt])
   @@map("offers")
 }
 
@@ -326,11 +335,14 @@ model Eatery {
   badgeReceipt           String?
   badgeFailureReason     String?
 
+  activatedAt DateTime @default(now())
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ownerId])
   @@index([active])
+  @@index([activatedAt])
   @@map("eateries")
 }
 

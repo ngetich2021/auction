@@ -3,10 +3,11 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { initiateStkPush, MpesaError } from "@/lib/mpesa";
 import { createOrderSchema } from "@/lib/validations/order";
 import type { ActionState } from "@/lib/actions/types";
 
+// Orders connect a buyer and seller for an auction listing — the purchase amount itself is
+// settled directly between them (see Terms §5), so this never initiates an M-Pesa payment.
 export async function createOrder(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const session = await auth();
   if (!session?.user) {
@@ -46,36 +47,24 @@ export async function createOrder(_prevState: ActionState, formData: FormData): 
       quantity: result.data.quantity,
       totalAmount,
       phone: result.data.phone,
-      status: "PENDING",
+      status: "COMPLETED",
     },
   });
 
-  try {
-    const stk = await initiateStkPush({
-      phone: result.data.phone,
-      amount: totalAmount,
-      accountReference: order.id,
-      transactionDesc: listing.title,
-    });
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { mpesaCheckoutRequestId: stk.checkoutRequestId },
-    });
-  } catch (error) {
-    const message = error instanceof MpesaError ? error.message : "Could not start M-Pesa payment. Please try again.";
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { status: "FAILED", failureReason: message },
-    });
-    return { ok: false, message };
-  }
+  const remaining = Math.max(listing.quantity - result.data.quantity, 0);
+  await prisma.listing.update({
+    where: { id: listing.id },
+    data: { quantity: remaining, status: remaining <= 0 ? "SOLD" : listing.status },
+  });
 
   revalidatePath("/");
   updateTag("orders");
+  updateTag("listings");
   updateTag("admin-orders");
+  updateTag("admin-listings");
   return {
     ok: true,
-    message: "Check your phone to complete the M-Pesa payment.",
+    message: "Order confirmed. Contact the seller to arrange payment and pickup/delivery.",
     data: { orderId: order.id },
   };
 }
@@ -95,7 +84,7 @@ export async function cancelOrder(_prevState: ActionState, formData: FormData): 
   if (!order || order.buyerId !== session.user.id) {
     return { ok: false, message: "Order not found." };
   }
-  if (order.status !== "PENDING" && order.status !== "FAILED") {
+  if (order.status !== "COMPLETED") {
     return { ok: false, message: "This order can no longer be cancelled." };
   }
 

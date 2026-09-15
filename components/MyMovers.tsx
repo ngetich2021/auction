@@ -5,7 +5,8 @@ import Image from "next/image";
 import type { ColumnDef } from "@tanstack/react-table";
 import { MoreHorizontal, Star } from "lucide-react";
 import { useSingleFlightAction } from "@/hooks/useSingleFlightAction";
-import { setMoverActive, deleteMover, payForMoverBadge } from "@/lib/actions/movers";
+import { setMoverActive, deleteMover, payForMoverBadge, reactivateMover } from "@/lib/actions/movers";
+import { getFreshness } from "@/lib/staleness";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/Modal";
@@ -22,6 +23,7 @@ import type { ClientMover } from "@/types/mover";
 function MoverRowActions({ mover }: { mover: ClientMover }) {
   const [toggleState, toggleAction, togglePending] = useSingleFlightAction(setMoverActive);
   const [deleteState, deleteAction, deletePending] = useSingleFlightAction(deleteMover);
+  const [reactivateState, reactivateAction, reactivatePending] = useSingleFlightAction(reactivateMover);
   const [editing, setEditing] = useState(false);
 
   function toggleActive() {
@@ -38,15 +40,21 @@ function MoverRowActions({ mover }: { mover: ClientMover }) {
     deleteAction(formData);
   }
 
-  const message = toggleState?.message ?? deleteState?.message;
-  const ok = toggleState?.ok ?? deleteState?.ok;
+  function reactivate() {
+    const formData = new FormData();
+    formData.set("moverId", mover.id);
+    reactivateAction(formData);
+  }
+
+  const message = toggleState?.message ?? deleteState?.message ?? reactivateState?.message;
+  const ok = toggleState?.ok ?? deleteState?.ok ?? reactivateState?.ok;
 
   return (
     <div className="flex flex-col items-end gap-1">
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <Button variant="ghost" size="icon" disabled={togglePending || deletePending}>
+            <Button variant="ghost" size="icon" disabled={togglePending || deletePending || reactivatePending}>
               <MoreHorizontal className="size-4" />
               <span className="sr-only">Open menu</span>
             </Button>
@@ -55,6 +63,7 @@ function MoverRowActions({ mover }: { mover: ClientMover }) {
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => setEditing(true)}>Edit</DropdownMenuItem>
           <DropdownMenuItem onClick={toggleActive}>{mover.active ? "Hide" : "Show"}</DropdownMenuItem>
+          <DropdownMenuItem onClick={reactivate}>Reactivate</DropdownMenuItem>
           {!mover.badge && (
             <BadgeUpgradeMenuItem
               idField="moverId"
@@ -106,7 +115,17 @@ const columns: ColumnDef<ClientMover>[] = [
   {
     accessorKey: "active",
     header: "Status",
-    cell: ({ row }) => <span className="text-xs">{row.original.active ? "Visible" : "Hidden"}</span>,
+    cell: ({ row }) => {
+      const { stale, daysLeft } = getFreshness(row.original.activatedAt);
+      return (
+        <div className="flex flex-col text-xs">
+          <span>{row.original.active ? "Visible" : "Hidden"}</span>
+          <span className={stale ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}>
+            {stale ? "Stale — reactivate to show" : `Reactivate within ${daysLeft}d`}
+          </span>
+        </div>
+      );
+    },
   },
   {
     id: "actions",

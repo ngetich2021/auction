@@ -8,7 +8,7 @@ type ChatMessage = { role: "user" | "assistant"; content: string; navigate?: str
 
 const GREETING: ChatMessage = {
   role: "assistant",
-  content: "Hi! I can help you find your way around Disposals, explain fees, or walk you through posting or buying something. What do you need?",
+  content: "Hi! I can help you find your way around Auctions, explain fees, or walk you through posting or buying something. What do you need?",
 };
 
 export function AssistantWidget() {
@@ -56,7 +56,7 @@ export function AssistantWidget() {
       {open && (
         <div className="flex h-[28rem] w-[90vw] max-w-sm flex-col overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl">
           <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-4 py-3">
-            <span className="text-sm font-semibold">Disposals assistant</span>
+            <span className="text-sm font-semibold">Auctions assistant</span>
             <button
               type="button"
               onClick={() => setOpen(false)}

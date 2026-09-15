@@ -64,9 +64,10 @@ export const listingFieldsSchema = z
 
 export type ListingFields = z.infer<typeof listingFieldsSchema>;
 
-export function validateListingImages(files: File[]): string | null {
-  if (files.length === 0) return "Add at least one photo";
-  if (files.length > MAX_IMAGES) return `You can add up to ${MAX_IMAGES} photos`;
+export function validateListingImages(files: File[], existingCount: number = 0): string | null {
+  const total = files.length + existingCount;
+  if (total === 0) return "Add at least one photo";
+  if (total > MAX_IMAGES) return `You can add up to ${MAX_IMAGES} photos`;
   for (const file of files) {
     if (!file.type.startsWith("image/")) return "Only image files are allowed";
     if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {

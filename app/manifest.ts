@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Disposals — Auctions & Movers",
-    short_name: "Disposals",
+    name: "Auctions — Movers & More",
+    short_name: "Auctions",
     description: "Auction items and mover listings near you.",
     start_url: "/",
     display: "standalone",

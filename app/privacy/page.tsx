@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { CallButton } from "@/components/ui/CallButton";
 
-export const metadata = { title: "Privacy Policy — Disposals" };
+export const metadata = { title: "Privacy Policy — Auctions" };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -16,12 +17,12 @@ export default function PrivacyPage() {
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-4">
       <div className="flex flex-col gap-1">
         <Link href="/" className="text-xs text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
-          ← Back to Disposals
+          ← Back to Auctions
         </Link>
         <h1 className="text-xl font-bold">Privacy Policy</h1>
         <p className="text-xs text-zinc-400">Last updated: {new Date().toLocaleDateString("en-KE", { year: "numeric", month: "long", day: "numeric" })}</p>
         <p className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-300">
-          This is a general template describing how Disposals currently handles data. It is provided
+          This is a general template describing how Auctions currently handles data. It is provided
           for transparency and is not a substitute for legal advice — please have it reviewed by a
           qualified lawyer (including for Kenya’s Data Protection Act, 2019) before relying on it for
           compliance purposes.
@@ -98,7 +99,7 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="7. Children">
-        <p>Disposals is not directed at children under 18, and we don’t knowingly collect data from them.</p>
+        <p>Auctions is not directed at children under 18, and we don’t knowingly collect data from them.</p>
       </Section>
 
       <Section title="8. Changes to this policy">
@@ -109,7 +110,13 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="9. Contact">
-        <p>Questions about this Privacy Policy can be sent through the contact details available in your account settings.</p>
+        <p>Questions about this Privacy Policy can be sent through the contacts provided.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <CallButton phone="0704876954" className="font-medium underline" />
+          <Link href="/contact" className="underline">
+            Contact page
+          </Link>
+        </div>
       </Section>
     </main>
   );
